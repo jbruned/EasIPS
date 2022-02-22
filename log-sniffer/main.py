@@ -1,5 +1,5 @@
 from logsniffer import *
 
-sniffer = LogSniffer('test.txt', '')
+sniffer = LogSniffer('test.txt', '([a-zA-Z]*)logout([a-zA-Z]*)')
 sniffer.start()
 
