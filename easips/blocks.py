@@ -1,5 +1,6 @@
 import subprocess as sub
 from abc import ABC, abstractmethod
+from typing import Union
 from warnings import warn
 from ipaddress import ip_address
 from time import time
@@ -11,10 +12,10 @@ class BaseBlock (ABC):
 	"""
 
 	blocked: dict
-	block_duration: int | None
-	persist_to_file: bool | str
+	block_duration: Union[int, None]
+	persist_to_file: Union[bool, str]
 
-	def __init__(self, block_duration: int = None, persist_to_file: bool | str = True):
+	def __init__(self, block_duration: int = None, persist_to_file: Union[bool,  str] = True):
 		"""
 		BasBlock's constructor
 		:param block_duration: int -> Specify the block duration in minutes (integer > 0 or None for permanent block)
@@ -42,7 +43,7 @@ class BaseBlock (ABC):
 		except ValueError:
 			return False
 
-	def block(self, ip_addr: str | list):
+	def block(self, ip_addr: Union[str, list]):
 		"""
 		This method blocks the specified IP address(es) from the corresponding service
 		"""
@@ -62,7 +63,7 @@ class BaseBlock (ABC):
 			else:
 				print(f"[Error] {ip_addr} couldn't be blocked from service '{self.get_service_name()}'", file=stderr)
 
-	def unblock(self, ip_addr: str | list):
+	def unblock(self, ip_addr: Union[str, list]):
 		"""
 		This method unblocks the specified IP address from the corresponding service
 		"""
@@ -82,7 +83,7 @@ class BaseBlock (ABC):
 			else:
 				print(f"[Error] {ip_addr} couldn't be unblocked from service '{self.get_service_name()}'", file=stderr)
 
-	def is_blocked(self, ip_addr: str | list) -> bool | list:
+	def is_blocked(self, ip_addr: Union[str, list]) -> Union [bool, list]:
 		"""
 		Determines if the IP address(es) are blocked from the specified service
 		"""

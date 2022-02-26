@@ -1,15 +1,17 @@
-import blocks, login_watchers
-from time import time
+import easips.blocks
+import easips.login_watchers
+from threading import Lock
+from time import time, sleep
 
 class ProtectedService:
 
-    def __init__(name: str, max_attempts: int = 10, time_period: int = 5, block_duration: int = 5):
+    def __init__(self, name: str, max_attempts: int = 10, time_period: int = 5, block_duration: int = 5):
         self.login_watcher = None
         self.block = None # block_duration
         self.failed = {}
         self.stopped = False
 
-    def refresh():
+    def refresh(self):
         if self.stopped:
             return
         now = time()
@@ -28,45 +30,45 @@ class ProtectedService:
                 self.block.block(addr)
                 self.failed[addr] = []
 
-    def toggleStopped():
+    def toggleStopped(self):
         self.stopped = not self.stopped
 
-    def get_json():
+    def get_json(self):
         return None # TODO: return list of blocked ips in json
 
-    def die():
+    def die(self):
         self.login_watcher.die()
         self.block.die()
 
 
 class EasIPS:
 
-    def __init__():
+    def __init__(self):
         self.services = {}
         self.next_id = 1
         self.admin_pwd = 'EasIPS'
         self.delta_t = 0.5
         self.lock = Lock()
 
-    def add_service(service: ProtectedService):
+    def add_service(self, service: ProtectedService):
         self.services[self.next_id] = service
 
-    def del_service(sid: int):
+    def del_service(self, sid: int):
         self.services[sid].stopped = True
         self.services[sid].die()
         del self.services[sid]
 
-    def set_admin_pwd(new_pwd: str):
+    def set_admin_pwd(self, new_pwd: str):
         self.admin_pwd = new_pwd
 
-    def get_json(sid: int = None):
+    def get_json(self, sid: int = None):
         self.lock.acquire()
         json = self.services[sid].get_json() if sid is not None \
             else None # TODO: return list of services in json
         self.lock.release()
         return json
 
-    def run():
+    def run(self):
         while True:
             for service in self.services.values():
                 self.lock.acquire()
