@@ -1,0 +1,123 @@
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>EasIPS</title>
+    <link href="./assets/bootstrap.min.css" rel="stylesheet">
+    <link href="./assets/bootstrap-icons.css" rel="stylesheet">
+</head>
+
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#">EasIPS</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-content" aria-controls="navbar-content" aria-expanded="false" aria-label="Toggle menu"><span class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navbar-content">
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                    <li class="nav-item"><a class="nav-link btn text-light my-1" href="javascript:loadData(true)"><i class="bi bi-arrow-clockwise"></i></a></li>
+                    <li class="nav-item"><span class="nav-link text-light" href="#">Refreshing in <span id="countdown">5</span>s...</span></li>
+                    <li class="nav-item"><span class="nav-link" href="#">|</span></li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle text-light" id="admin-dropdown" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Admin</a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="admin-dropdown">
+                            <li><a class="dropdown-item" href="#">Change password</a></li>
+                            <li><a class="dropdown-item" href="#">Log out</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="text-center my-4">
+            <h1>Welcome to EasIPS!</h1>
+            <p class="lead">An easy-to-use and customizable Intrusion Prevention System</p>
+        </div>
+        <hr class="my-4">
+        <div class="row">
+            <div class="col-md-8"><h2>My services</h2></div>
+            <div class="col-md-4 text-end"><a class="btn btn-primary"><i class="bi bi-plus-circle me-2"></i>Add service</a></div>
+        </div>
+        <div class="row" id="service-pool">
+            <!--<div class="col-md-4">
+                <div class="card my-3">
+                    <div class="card-header">
+                        <h3 class="card-title">Joomla</h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text mb-0"><i class="bi bi-circle-fill me-2 text-success"></i>No currently blocked IPs</p>
+                        <p class="text-muted pt-0 ms-4">Last block 3 mins ago</p>
+                        <p class="card-text"><i class="bi bi-circle-fill me-2 text-danger"></i>3 blocked IPs in the last 24h</p>
+                    </div>
+                    <div class="btn-group rounded-bottom bg-primary" style="margin-bottom: -2px">
+                        <a class="btn btn-primary rounded-bottom rounded-0"><i class="bi bi-gear-fill me-2"></i>Service settings</a>
+                        <a class="btn btn-primary rounded-bottom rounded-0"><i class="bi bi-list me-2"></i>Manage blocked IPs</a>
+                    </div>
+                </div>
+            </div>-->
+        </div>
+    </main>
+
+    <!--<footer class="footer bg-light mt-3">
+        <div class="container py-3">
+            <span class="text-muted">EasIPS, developed in 2022 by ...</span>
+        </div>
+    </footer>-->
+
+    <script src="./assets/bootstrap.bundle.min.js"></script>
+
+    <script>
+
+        const servicePool = document.getElementById('service-pool'),
+		      countdown = document.getElementById('countdown'),
+              REFRESH_INTERVAL = 5; // In seconds
+		let left4refresh = 0;
+        function addService(id, name, blockednow, blocked24, lastblock) {
+            servicePool.innerHTML +=
+                '            <div class="col-md-4">\n' +
+                '                <div class="card my-3">\n' +
+                '                    <div class="card-header">\n' +
+                '                        <h3 class="card-title">' + name + '</h3>\n' +
+                '                    </div>\n' +
+                '                    <div class="card-body">\n' +
+                '                        <p class="card-text mb-0"><i class="bi bi-circle-fill me-2 text-' + (blockednow == 0 ? 'success' : 'danger')  + '"></i>' + (blockednow || 'No') + ' currently blocked IP' + (blockednow == 1 ? '' : 's') + '</p>\n' +
+                '                        <p class="text-muted pt-0 ms-4">Last block ' + (lastblock || '-') + ' mins ago</p>\n' +
+                '                        <p class="card-text"><i class="bi bi-circle-fill me-2 text-' + (blocked24 == 0 ? 'success' : 'danger')  + '"></i>' + (blocked24 || 'No') + ' blocked IP' + (blocked24 == 1 ? '' : 's') + ' in the last 24h</p>\n' +
+                '                    </div>\n' +
+                '                    <div class="btn-group rounded-bottom bg-primary" style="margin-bottom: -2px">\n' +
+                '                        <a class="btn btn-primary rounded-bottom rounded-0"><i class="bi bi-gear-fill me-2"></i>Service settings</a>\n' +
+                '                        <a class="btn btn-primary rounded-bottom rounded-0" href="service?id=' + id + '"><i class="bi bi-list me-2"></i>Manage blocked IPs</a>\n' +
+                '                    </div>\n' +
+                '                </div>\n' +
+                '            </div>'
+        }
+        function loadData(manual=false) {
+			if (manual || left4refresh <= 0) {
+				let ajaxResult = [
+						[1, 'Joomla', 0, 10, 23],
+						[2, 'SSH', 0, Math.floor(Math.random() * 10), 0]
+					],  //TODO: get the services via AJAX
+					nResults = ajaxResult.length;
+				servicePool.innerHTML = '';
+				for (let i=0; i<nResults; i++)
+					addService(ajaxResult[i][0], ajaxResult[i][1], ajaxResult[i][2], ajaxResult[i][3], ajaxResult[i][4]);
+				if (nResults == 0) {
+					// TODO: show message "No blocked IPs"
+				}
+				left4refresh = REFRESH_INTERVAL;
+			} else
+				left4refresh--;
+			countdown.innerHTML = left4refresh + "";
+			if (!manual)
+				setTimeout(loadData, 1000);
+        }
+        loadData();
+
+    </script>
+
+</body>
+
+</html>
