@@ -6,7 +6,7 @@ joomla_log_regex = r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}\tINFO\s(\
 
 ssh_log_location = "../ssh/logs/auth.log"
 # language=regexp
-ssh_log_regex = r'^\w{3}\s\d{1,2}\s\d{2}:\d{2}:\d{2}\ssshserver.*authentication\sfailure.*rhost=(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*'
+ssh_log_regex = r'^\w{3}\s\d{1,2}\s\d{2}:\d{2}:\d{2}\ssshserver.*Fail.*password.*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*'
 
 
 sniffer = LogSniffer(ssh_log_location, ssh_log_regex)
