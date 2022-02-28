@@ -1,35 +1,53 @@
 import subprocess as sub
+from flask_sqlalchemy import SQLAlchemy
 from abc import ABC, abstractmethod
 from typing import Union
 from warnings import warn
 from ipaddress import ip_address
 from time import time
 from sys import stderr
+import datetime
+import gui as app
 
 class BaseBlock (ABC):
 	"""
 	This interface is used to implement adapters to each of the required services.
 	"""
 
-	blocked: dict
-	block_duration: Union[int, None]
-	persist_to_file: Union[bool, str]
+	settings: app.Settings
+	db: SQLAlchemy
 
-	def __init__(self, block_duration: int = None, persist_to_file: Union[bool,  str] = True):
+	def __init__(self, settings, db):
 		"""
 		BasBlock's constructor
-		:param block_duration: int -> Specify the block duration in minutes (integer > 0 or None for permanent block)
-					 			      Default value: None
-		:param persist_to_file: bool | str -> False prevents the list of IP addresses from being saved to a file
-										      Otherwise, the file name should be specified (or True for default name)
+		:param settings: app.Settings -> Specify the set variables for the blocking process, such as the number of attempts, block duration and time span
+		:param db: SQLAlchemy -> The database connection. This is used to store and read the login attempts and blocked IPs
 		"""
-		self.blocked = {}
-		if block_duration is None or block_duration > 0:
-			self.block_duration = block_duration
+		self.settings = settings
+		self.db = db
+
+
+	def log_ip(self, ip: str, moment: Union[datetime.datetime, None] = None):
+		"""
+		This method logs when an IP has made a login attempt. If this attempt violates the set constraints, it will be blocked.
+		This method also takes care of removing the blocked addresses in due time.
+		:param ip: str -> The IP address that has attempted to log in
+		:param moment: datetime.datetime | None -> The moment at which this IP has tried to log in, and thus the moment to be considered in processing it. Defaults to current time
+		"""
+		if moment is None:
+			moment = datetime.datetime.now()
+
+		if not BaseBlock.ip_addr_is_valid(ip):
+			warn(f"[Warning] {ip} is not a valid IP address to log")
 		else:
-			self.block_duration = None
-			warn(f"[Warning] Invalid block duration ({block_duration}), defaulting to permanent block")
-		self.persist_to_file = persist_to_file
+			self.db.session.add(app.IPLoginTry(
+				ip=ip,
+				moment=moment
+			))
+			self.db.session.commit()  # enter new try
+
+		self.refresh(moment)
+		self.block_if_needed(ip, moment)
 
 
 	@staticmethod
@@ -43,22 +61,24 @@ class BaseBlock (ABC):
 		except ValueError:
 			return False
 
-	def block(self, ip_addr: Union[str, list]):
+	def block(self, ip_addr: Union[str, list], moment: Union[datetime.datetime, None] = None):
 		"""
-		This method blocks the specified IP address(es) from the corresponding service
+		This method blocks the specified IP address(es) from the corresponding service.
+		The provided time will be regarded as the moment at which it is blocked. This defaults to the current time.
 		"""
+		if moment is None:
+			moment = datetime.datetime.now()
+
 		if isinstance(ip_addr, list):
 			for single_ip in ip_addr:
-				self.block(single_ip)
+				self.block(single_ip, moment)
 		else:
 			ip_addr = ip_addr.lower()
 			if not BaseBlock.ip_addr_is_valid(ip_addr):
 				warn(f"[Warning] {ip_addr} is not a valid IP address to block")
-			elif self.is_blocked(ip_addr):
-				print(f"[Info] {ip_addr} was already blocked from service '{self.get_service_name()}'")
+			elif self.is_blocked(ip_addr, moment):
+				print(f"[Info] {ip_addr} was already blocked from service '{self.get_service_name()}', time is now updated")
 			elif self._block_from_service(ip_addr):
-				self.blocked[ip_addr] = time()
-				self.store_blocked()
 				print(f"[Info] {ip_addr} has been successfully blocked from service '{self.get_service_name()}'")
 			else:
 				print(f"[Error] {ip_addr} couldn't be blocked from service '{self.get_service_name()}'", file=stderr)
@@ -77,66 +97,71 @@ class BaseBlock (ABC):
 			elif not self.is_blocked(ip_addr):
 				print(f"[Info] Attempted to unblock not blocked address {ip_addr} from service '{self.get_service_name()}'")
 			elif self._unblock_from_service(ip_addr):
-				del self.blocked[ip_addr]
-				self.store_blocked()
 				print(f"[Info] {ip_addr} has been successfully unblocked from service '{self.get_service_name()}'")
 			else:
 				print(f"[Error] {ip_addr} couldn't be unblocked from service '{self.get_service_name()}'", file=stderr)
 
-	def is_blocked(self, ip_addr: Union[str, list]) -> Union [bool, list]:
+	def is_blocked(self, ip_addr: Union[str, list], moment: Union[datetime.datetime, None]) -> Union [bool, list]:
 		"""
-		Determines if the IP address(es) are blocked from the specified service
+		Determines if the IP address(es) are blocked from the specified service.
+		If :param moment: is provided, it will also update the time of said block to the provided moment.
 		"""
 		if isinstance(ip_addr, list):
-			return [self.is_blocked(single_ip) for single_ip in ip_addr]
+			return [self.is_blocked(single_ip, moment) for single_ip in ip_addr]
 		ip_addr = ip_addr.lower()
 		if not BaseBlock.ip_addr_is_valid(ip_addr):
 			warn(f"[Warning] {ip_addr} is not a valid IP address to check")
 			return False
-		return ip_addr not in self.blocked.keys() and \
-			   (self.block_duration is None or time() - self.blocked[ip_addr] > self.block_duration)
 
-	def store_blocked(self, file_name: str = None):
-		"""
-		Saves the list of blocked IP addresses to a file
-		"""
-		if not self.persist_to_file:
-			warn("[Warning] List of blocked IPs wasn't saved because persist_to_file = False was passed to constructor")
-			return
-		file_name = file_name or f"blocked_{self.get_service_name().lower()}"
-		try:
-			f = open(file_name, "w")
-			f.write('\n'.join(self.blocked.keys()))
-			f.close()
-			print(f"[Info] Saved {len(self.blocked)} blocked IPs from '{self.get_service_name}' to file '{file_name}'")
-		except IOError:
-			print(f"[Error] Couldn't write blocked IP addresses to file '{file_name}', check permissions", file=stderr)
+		exists = False
+		for bi in app.BlockedIP.query.filter(app.BlockedIP.ip == ip_addr):
+			exists = True
+			if moment:
+				bi.blocked_at = moment
+				self.db.session.add(bi)
+			else:
+				break
 
-	def load_blocked(self, file_name: str = None):
-		"""
-		Loads the list of blocked IP addresses from a file
-		"""
-		file_name = file_name or f"blocked_{self.get_service_name().lower()}"
-		try:
-			f = open(file_name, "r")
-			self.blocked = {single_ip: time() for single_ip in f.read().split('\n')}
-			f.close()
-			print(f"[Info] Loaded {len(self.blocked)} blocked IPs from '{self.get_service_name}' from '{file_name}'")
-		except FileNotFoundError:
-			print(f"[Error] Couldn't load blocked IP addresses from file '{file_name}' because it doesn't exist",
-				  file=stderr)
-		except IOError:
-			print(f"[Error] Couldn't load blocked IP addresses from file '{file_name}', check permissions", file=stderr)
+		if moment:		
+			self.db.session.commit()
+		return exists
 
-	def refresh(self):
+
+	def refresh(self, moment: Union[datetime.datetime, None] = None):
 		"""
-		Unblocks from the service those IPs whose block duration has been reached
+		Unblocks from the service those IPs whose block duration has been reached, and blocks those that have exceeded their tries
 		"""
-		if self.block_duration is None:
-			return
-		for single_ip, block_start in self.blocked.items():
-			if time() - block_start > self.block_duration:
-				self.unblock(single_ip)
+		if moment is None:
+			moment = datetime.datetime.now()
+
+		app.IPLoginTry.query.filter(
+			app.IPLoginTry.moment < moment - datetime.timedelta(minutes=self.settings.time)
+		).delete()  # remove old tries
+
+		if self.settings.block_len:
+			# the blocks aren't indefinitely? Then it might be time for some unblocking
+			expire = app.BlockedIP.query.filter(app.BlockedIP.blocked_at < moment - datetime.timedelta(minutes=self.settings.block_len))
+			for e in expire:
+				self.unblock(e.ip)
+			expire.delete()
+
+	def block_if_needed(self, ip: str, moment: Union[datetime.datetime, None] = None):
+		"""
+		Checks if a certain IP needs to be blocked by looking at its recent login attempts. This also deletes the old ones.
+		"""
+		if moment is None:
+			moment = datetime.datetime.now()
+
+		if len(app.IPLoginTry.query.filter(
+					app.IPLoginTry.ip == ip and
+					app.IPLoginTry.moment >= moment - datetime.timedelta(minutes=self.settings.time)
+				).all()) >= self.settings.tries:
+			self.db.session.add(app.BlockedIP(
+				ip=ip,
+				blocked_at=moment
+			))
+			self.db.session.commit()
+			self.block(ip, moment)
 
 	def clear(self):
 		"""
