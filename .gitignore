@@ -5,4 +5,6 @@
 /joomla/webserver/
 /phpMyAdmin/database/
 /phpMyAdmin/webserver/
+/wordpress/database/
+/wordpress/webserver/
 /ssh/logs/
