@@ -3,4 +3,6 @@
 *__pycache__
 /joomla/database/
 /joomla/webserver/
+/phpMyAdmin/database/
+/phpMyAdmin/webserver/
 /ssh/logs/
