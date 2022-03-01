@@ -101,11 +101,14 @@ class BaseBlock (ABC):
 			else:
 				print(f"[Error] {ip_addr} couldn't be unblocked from service '{self.get_service_name()}'", file=stderr)
 
-	def is_blocked(self, ip_addr: Union[str, list], moment: Union[datetime.datetime, None]) -> Union [bool, list]:
+	def is_blocked(self, ip_addr: Union[str, list], moment: Union[datetime.datetime, None] = None) -> Union [bool, list]:
 		"""
 		Determines if the IP address(es) are blocked from the specified service.
 		If :param moment: is provided, it will also update the time of said block to the provided moment.
 		"""
+		if not moment:
+			moment = datetime.datetime.now()
+
 		if isinstance(ip_addr, list):
 			return [self.is_blocked(single_ip, moment) for single_ip in ip_addr]
 		ip_addr = ip_addr.lower()
@@ -156,12 +159,13 @@ class BaseBlock (ABC):
 					app.IPLoginTry.ip == ip and
 					app.IPLoginTry.moment >= moment - datetime.timedelta(minutes=self.settings.time)
 				).all()) >= self.settings.tries:
-			self.db.session.add(app.BlockedIP(
-				ip=ip,
-				blocked_at=moment
-			))
-			self.db.session.commit()
-			self.block(ip, moment)
+			if not self.is_blocked(ip, moment):
+				self.db.session.add(app.BlockedIP(
+					ip=ip,
+					blocked_at=moment
+				))
+				self.db.session.commit()
+				self.block(ip, moment)
 
 	def clear(self):
 		"""
