@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title>Manage service | EasIPS</title>
-    <link href="./assets/bootstrap.min.css" rel="stylesheet">
-    <link href="./assets/bootstrap-icons.css" rel="stylesheet">
+    <link href="../assets/bootstrap.min.css" rel="stylesheet">
+    <link href="../assets/bootstrap-icons.css" rel="stylesheet">
     <style>
         .table > tbody > tr > td {
             vertical-align: middle;
@@ -27,7 +27,7 @@
                         <a class="nav-link dropdown-toggle text-light" id="admin-dropdown" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Admin</a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="admin-dropdown">
                             <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#pmodal">Change password</a></li>
-                            <li><a class="dropdown-item" href="./logout">Log out</a></li>
+                            <li><a class="dropdown-item" href="../logout">Log out</a></li>
                         </ul>
                     </li>
                 </ul>
@@ -37,7 +37,7 @@
 
     <main class="container">
         <div class="my-4">
-            <a class="btn btn-primary" href="./dashboard.html" style="margin-top: -20px"><i class="bi bi-arrow-left me-2"></i>Back to overview</a><h1 class="d-inline ms-md-3">Manage blocked IPs</h1>
+            <a class="btn btn-primary" href=".." style="margin-top: -20px"><i class="bi bi-arrow-left me-2"></i>Back to overview</a><h1 class="d-inline ms-md-3">Manage blocked IPs</h1>
             <p class="lead">Here you can block or unblock IP addresses for the selected service</p>
         </div>
         <hr class="my-4">
@@ -72,7 +72,7 @@
 	</div>
 	<div class="modal fade" id="pmodal" tabindex="-1" aria-labelledby="ptitle" aria-hidden="true">
 		<div class="modal-dialog">
-			<form class="modal-content" action="./password" method="POST" onsubmit="return changePassword(event)">
+			<form class="modal-content" action="../password" method="POST" onsubmit="return changePassword(event)">
 				<div class="modal-header">
 					<h5 class="modal-title" id="ptitle">Change admin password</h5>
 					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -100,7 +100,7 @@
 	</div>
 	<div class="modal fade" id="imodal" tabindex="-1" aria-labelledby="ititle" aria-hidden="true">
 		<div class="modal-dialog">
-			<form class="modal-content" action="./blocked" method="POST" onsubmit="return addIp(event)">
+			<form class="modal-content" action="../blocked" method="POST" onsubmit="return addIp(event)">
 				<div class="modal-header">
 					<h5 class="modal-title" id="ititle">Manually block</h5>
 					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -119,12 +119,12 @@
 		</div>
 	</div>
 
-    <script src="./assets/bootstrap.bundle.min.js"></script>
+    <script src="../assets/bootstrap.bundle.min.js"></script>
 
     <script>
 		
 		let id_path = window.location.href.split('/').pop();
-		const SERVICE_ID = Number.isInteger(id_path) ? id_path : new URL(window.location.href).searchParams.get("id") || '';
+		const SERVICE_ID = !isNaN(id_path) ? id_path : new URL(window.location.href).searchParams.get("id") || '';
 		
 		/* SUCCESS OR ERROR MESSAGE */
 		const success_modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('success-modal')),
@@ -154,13 +154,11 @@
 		const ipPool = document.getElementById('ip-pool'),
               ipTable = document.getElementById('ip-table'),
 			  noResults = document.getElementById('no-results'),
-			  serviceId = new URL(window.location.href).searchParams.get("id"),
               REFRESH_INTERVAL = 5; // In seconds
-		console.log(serviceId);
 		let ipCount = 0,
 		    left4refresh = 0;
 		function blockUnblock(addr, block=false) {
-			console.log("// TODO: send AJAX request to " + (block ? '' : 'un') + 'block ' + addr + ' from service #' + serviceId);
+			console.log("// TODO: send AJAX request to " + (block ? '' : 'un') + 'block ' + addr + ' from service #' + SERVICE_ID);
 			let ajax_error = "AJAX requests are<br>not implemented yet"; // Blank means no error
 			modalResult(ajax_error);
 		}
