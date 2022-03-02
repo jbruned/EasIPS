@@ -7,7 +7,7 @@ from ipaddress import ip_address
 from time import time
 from sys import stderr
 import datetime
-import gui as app
+import easips.gui as app
 
 class BaseBlock (ABC):
 	"""
