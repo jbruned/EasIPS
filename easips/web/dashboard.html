@@ -6,6 +6,12 @@
     <title>EasIPS</title>
     <link href="./assets/bootstrap.min.css" rel="stylesheet">
     <link href="./assets/bootstrap-icons.css" rel="stylesheet">
+	<style>
+		button:disabled > span {
+			cursor: not-allowed;
+			pointer-events: auto;
+		}
+	</style>
 </head>
 
 <body>
@@ -22,8 +28,8 @@
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle text-light" id="admin-dropdown" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Admin</a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="admin-dropdown">
-                            <li><a class="dropdown-item" href="#">Change password</a></li>
-                            <li><a class="dropdown-item" href="#">Log out</a></li>
+                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#pmodal">Change password</a></li>
+                            <li><a class="dropdown-item" href="./logout">Log out</a></li>
                         </ul>
                     </li>
                 </ul>
@@ -34,87 +40,237 @@
     <main class="container">
         <div class="text-center my-4">
             <h1>Welcome to EasIPS!</h1>
-            <p class="lead">An easy-to-use and customizable Intrusion Prevention System</p>
+            <p class="lead">An easy-to-use and customizable modular Intrusion Prevention System</p>
         </div>
         <hr class="my-4">
         <div class="row">
             <div class="col-md-8"><h2>My services</h2></div>
-            <div class="col-md-4 text-end"><a class="btn btn-primary"><i class="bi bi-plus-circle me-2"></i>Add service</a></div>
+            <div class="col-md-4 text-end"><a class="btn btn-primary" onclick="fillServiceSettings()" data-bs-toggle="modal" data-bs-target="#smodal"><i class="bi bi-plus-circle me-2"></i>Add service</a></div>
         </div>
         <div class="row" id="service-pool">
-            <!--<div class="col-md-4">
-                <div class="card my-3">
-                    <div class="card-header">
-                        <h3 class="card-title">Joomla</h3>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-text mb-0"><i class="bi bi-circle-fill me-2 text-success"></i>No currently blocked IPs</p>
-                        <p class="text-muted pt-0 ms-4">Last block 3 mins ago</p>
-                        <p class="card-text"><i class="bi bi-circle-fill me-2 text-danger"></i>3 blocked IPs in the last 24h</p>
-                    </div>
-                    <div class="btn-group rounded-bottom bg-primary" style="margin-bottom: -2px">
-                        <a class="btn btn-primary rounded-bottom rounded-0"><i class="bi bi-gear-fill me-2"></i>Service settings</a>
-                        <a class="btn btn-primary rounded-bottom rounded-0"><i class="bi bi-list me-2"></i>Manage blocked IPs</a>
-                    </div>
-                </div>
-            </div>-->
         </div>
     </main>
 
-    <!--<footer class="footer bg-light mt-3">
-        <div class="container py-3">
-            <span class="text-muted">EasIPS, developed in 2022 by ...</span>
-        </div>
-    </footer>-->
+	<div class="modal fade" id="success-modal" tabindex="-1" aria-labelledby="success-title" aria-hidden="true">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="text-center my-5 d-block">
+					<i class="bi bi-check2-circle h1 d-block text-success" id="success-icon"></i><span class="h3" id="success-title">Saved successfully!</span>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="modal fade" id="smodal" tabindex="-1" aria-labelledby="stitle" aria-hidden="true">
+		<div class="modal-dialog">
+			<form class="modal-content" action="./settings" method="POST" onsubmit="return saveServiceSettings(event)">
+				<div class="modal-header">
+					<h5 class="modal-title" id="stitle">Service settings</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+				  <div class="modal-body">
+					<div class="text-center my-5 d-block" id="sload">
+						<div class="spinner-border" role="status">
+							<span class="visually-hidden">Loading...</span>
+						</div>
+					</div>
+					<div id="sform" class="d-none">
+						<div class="mb-3">
+							<label for="sname" class="form-label">Name</label>
+							<input type="text" class="form-control" id="sname" name="name" placeholder="E.g.: Internal SSH Server">
+						</div>
+						<div class="mb-3">
+							<label for="stype" class="form-label">Type</label>
+							<select class="form-select" id="stype" name="type" required>
+								<option disabled></option>
+								<option>SSH</option>
+								<option>Joomla</option>
+								<option>WordPress</option>
+								<option>PhpMyAdmin</option>
+							</select>
+						</div>
+						<div class="mb-3">
+							<label for="spath" class="form-label">Log file location</label>
+							<input type="text" class="form-control" id="spath" name="path">
+							<div class="form-text">Leave empty to use the default path for the selected service</div>
+						</div>
+						<div class="row">
+							<div class="col-sm-6">
+								<label for="sattempts" class="form-label">Maximum failed attempts</label>
+								<input type="number" class="form-control" id="sattempts" name="attempts">
+								<div class="form-text">Allowed login tries within 5 min</div>
+							</div>
+							<div class="col-sm-6">
+								<label for="stime" class="form-label">Block duration</label>
+								<input type="number" class="form-control" id="stime" name="time">
+								<div class="form-text">Leave empty for permanent</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<input type="hidden" name="sid" id="sid">
+					<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+					<button type="submit" class="btn btn-primary" id="ssave" disabled><span>Save</span></button>
+				</div>
+			</form>
+		</div>
+	</div>
+	<div class="modal fade" id="pmodal" tabindex="-1" aria-labelledby="ptitle" aria-hidden="true">
+		<div class="modal-dialog">
+			<form class="modal-content" action="./password" method="POST" onsubmit="return changePassword(event)">
+				<div class="modal-header">
+					<h5 class="modal-title" id="ptitle">Change admin password</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+				<div class="modal-body">
+					<div class="mb-3">
+						<label for="pold" class="form-label">Old password</label>
+						<input type="password" class="form-control" id="pold" name="old" required>
+					</div>
+					<div class="mb-3">
+						<label for="pnew" class="form-label">New password</label>
+						<input type="password" class="form-control" id="pnew" name="new" required>
+					</div>
+					<div class="mb-3">
+						<label for="prepeat" class="form-label">Repeat password</label>
+						<input type="password" class="form-control" id="prepeat" name="repeat" required>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+					<button type="submit" class="btn btn-primary"><span>Save</span></button>
+				</div>
+			</form>
+		</div>
+	</div>
 
     <script src="./assets/bootstrap.bundle.min.js"></script>
 
     <script>
 
+        /* SUCCESS OR ERROR MESSAGE */
+		const success_modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('success-modal')),
+			  success_icon = document.getElementById('success-icon'),
+			  success_title = document.getElementById('success-title');
+		function modalResult(error_message = null) {
+			success_modal.show();
+			success_title.innerHTML = error_message || 'Saved successfully!';
+			if (error_message) {
+				success_icon.classList.remove('bi-check2-circle');
+				success_icon.classList.remove('text-danger');
+				success_icon.classList.add('bi-x-circle');
+				success_icon.classList.add('text-danger');
+			} else {
+				success_icon.classList.add('bi-check2-circle');
+				success_icon.classList.add('text-success');
+				success_icon.classList.remove('bi-x-circle');
+				success_icon.classList.remove('text-danger');
+				setTimeout(function() {
+					success_modal.hide();
+				}, 2500);
+			}
+			loadData(true);
+		}
+		
+		/* AJAX DATA LOADING */
         const servicePool = document.getElementById('service-pool'),
 		      countdown = document.getElementById('countdown'),
               REFRESH_INTERVAL = 5; // In seconds
 		let left4refresh = 0;
-        function addService(id, name, blockednow, blocked24, lastblock) {
+		function addService(id, name, running, blockednow, blocked24, lastblock) {
+			let is_running = !(running === 'false' || running == 0 || false);
             servicePool.innerHTML +=
                 '            <div class="col-md-4">\n' +
                 '                <div class="card my-3">\n' +
-                '                    <div class="card-header">\n' +
-                '                        <h3 class="card-title">' + name + '</h3>\n' +
-                '                    </div>\n' +
+                '                    <div class="card-header d-flex justify-content-between align-items-center"><div>\n' +
+                '                        <h3 class="card-title m-0">' + name + '</h3>\n' +
+				'                        <span class="text-' + (is_running ? 'success' : 'danger') + '" style="margin-left: -4px"><i class="bi bi-' + (is_running ? 'play' : 'pause') + '-fill me-1"></i>' + (is_running ? 'Running' : 'Paused') + '</h3>\n' +
+                '                    </div><div class="btn-group-vertical" role="group" aria-label="Service options"><a class="btn btn-warning" href="javascript:serviceAction(' + id + ', \'playpause\')"><i class="bi bi-' + (is_running ? 'pause' : 'play') + '-fill" style="margin: 0px -5px"></i></a><a class="btn btn-danger" href="javascript:serviceAction(' + id + ', \'delete\')"><i class="bi bi-trash3-fill" style="margin: 0px -5px"></i></a></div></div>\n' +
                 '                    <div class="card-body">\n' +
                 '                        <p class="card-text mb-0"><i class="bi bi-circle-fill me-2 text-' + (blockednow == 0 ? 'success' : 'danger')  + '"></i>' + (blockednow || 'No') + ' currently blocked IP' + (blockednow == 1 ? '' : 's') + '</p>\n' +
                 '                        <p class="text-muted pt-0 ms-4">Last block ' + (lastblock || '-') + ' mins ago</p>\n' +
                 '                        <p class="card-text"><i class="bi bi-circle-fill me-2 text-' + (blocked24 == 0 ? 'success' : 'danger')  + '"></i>' + (blocked24 || 'No') + ' blocked IP' + (blocked24 == 1 ? '' : 's') + ' in the last 24h</p>\n' +
                 '                    </div>\n' +
                 '                    <div class="btn-group rounded-bottom bg-primary" style="margin-bottom: -2px">\n' +
-                '                        <a class="btn btn-primary rounded-bottom rounded-0"><i class="bi bi-gear-fill me-2"></i>Service settings</a>\n' +
-                '                        <a class="btn btn-primary rounded-bottom rounded-0" href="service?id=' + id + '"><i class="bi bi-list me-2"></i>Manage blocked IPs</a>\n' +
+                '                        <a class="btn btn-primary rounded-bottom rounded-0" data-bs-toggle="modal" data-bs-target="#smodal" onclick="loadServiceSettings(' + id + ')"><i class="bi bi-gear-fill me-2"></i>Settings</a>\n' +
+                '                        <a class="btn btn-primary rounded-bottom rounded-0" href="service.html?id=' + id + '"><i class="bi bi-list me-2"></i>Blocked IPs</a>\n' +
                 '                    </div>\n' +
                 '                </div>\n' +
                 '            </div>'
         }
         function loadData(manual=false) {
-			if (manual || left4refresh <= 0) {
+			if (manual || left4refresh == 0) {
 				let ajaxResult = [
-						[1, 'Joomla', 0, 10, 23],
-						[2, 'SSH', 0, Math.floor(Math.random() * 10), 0]
+						[1, 'Joomla', true, 0, 10, 23],
+						[2, 'SSH', false, 0, Math.floor(Math.random() * 10), 0]
 					],  //TODO: get the services via AJAX
 					nResults = ajaxResult.length;
 				servicePool.innerHTML = '';
 				for (let i=0; i<nResults; i++)
-					addService(ajaxResult[i][0], ajaxResult[i][1], ajaxResult[i][2], ajaxResult[i][3], ajaxResult[i][4]);
-				if (nResults == 0) {
-					// TODO: show message "No blocked IPs"
-				}
+					addService(ajaxResult[i][0], ajaxResult[i][1], ajaxResult[i][2], ajaxResult[i][3], ajaxResult[i][4], ajaxResult[i][4]);
+				if (nResults == 0)
+					servicePool.innerHTML = '<div class="text-center my-5 text-muted">No services have been created yet</div>';
 				left4refresh = REFRESH_INTERVAL;
 			} else
 				left4refresh--;
-			countdown.innerHTML = left4refresh + "";
+			countdown.innerHTML = Math.max(left4refresh, 0) + "";
 			if (!manual)
 				setTimeout(loadData, 1000);
         }
         loadData();
+		
+		/* AJAX DATA UPDATING */
+		const smodal = document.getElementById('smodal'),
+		      pmodal = document.getElementById('pmodal'),
+			  sload = document.getElementById('sload'),
+			  sform = document.getElementById('sform'),
+			  ssave = document.getElementById('ssave'),
+			  field_list = ['sid', 'sname', 'stype', 'spath', 'sattempts', 'stime'];	
+		function fillServiceSettings(service_data = null) {
+			for (let i=0; i < field_list.length; i++)
+				document.getElementById(field_list[i]).value = service_data === null ? '' : service_data[i];
+			ssave.disabled = false;
+			sload.classList.replace('d-block', 'd-none');
+			sform.classList.replace('d-none', 'd-block');
+		}
+		function loadServiceSettings(id) {
+			sload.classList.replace('d-none', 'd-block');
+			sform.classList.replace('d-block', 'd-none');
+			ssave.disabled = true;
+			let ajax_error = ""; // Blank means no error
+			if (ajax_error)
+				modalResult(ajax_error);
+			else {
+				let ajax_data = [1, 'Service name', 'SSH', '/etc/ssh/log', 10, 20]; // TODO: get though AJAX
+				fillServiceSettings(ajax_data);
+			}
+		}
+		function saveServiceSettings(e) {
+			e.preventDefault();
+			sload.classList.replace('d-none', 'd-block');
+			sform.classList.replace('d-block', 'd-none');
+			ssave.disabled = true;
+			// TODO: send AJAX POST request
+			let ajax_error = "AJAX requests are<br>not implemented yet"; // Blank means no error
+			bootstrap.Modal.getOrCreateInstance(smodal).hide();
+			modalResult(ajax_error);
+		}
+		function changePassword(e) {
+			e.preventDefault();
+			// TODO: send AJAX POST request
+			let ajax_error = "The auth system is not<br>implemented yet"; // Blank means no error
+			document.getElementById('pold').value = "";
+			document.getElementById('pnew').value = "";
+			document.getElementById('prepeat').value = "";
+			bootstrap.Modal.getOrCreateInstance(pmodal).hide();
+			modalResult(ajax_error);
+		}
+		function serviceAction(id, action) {
+			// Action can be 'playpause' or 'delete'
+			// TODO: send AJAX POST request
+			let ajax_error = "AJAX calls aren't<br>implemented yet"; // Blank means no error
+			modalResult(ajax_error);
+		}
 
     </script>
 
