@@ -1,2 +1,2 @@
-from easips.app import EasIPS
+from easips import EasIPS
 EasIPS().run()
