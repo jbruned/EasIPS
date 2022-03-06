@@ -51,6 +51,7 @@
                 <td width="80px">#</td>
                 <td>IP address</td>
                 <td>Block started</td>
+                <td>Status</td>
                 <td width="150px">Actions</td>
             </tr>
             </thead>
@@ -120,6 +121,7 @@
 	</div>
 
     <script src="../assets/bootstrap.bundle.min.js"></script>
+    <script src="../assets/jquery-3.6.0.min.js"></script>
 
     <script>
 		
@@ -130,9 +132,9 @@
 		const success_modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('success-modal')),
 			  success_icon = document.getElementById('success-icon'),
 			  success_title = document.getElementById('success-title');
-		function modalResult(error_message = null) {
+		function modalResult(error_message = null, success_message = null) {
 			success_modal.show();
-			success_title.innerHTML = error_message || 'Saved successfully!';
+			success_title.innerHTML = error_message || success_message || 'Saved successfully!';
 			if (error_message) {
 				success_icon.classList.remove('bi-check2-circle');
 				success_icon.classList.remove('text-danger');
@@ -145,9 +147,9 @@
 				success_icon.classList.remove('text-danger');
 				setTimeout(function() {
 					success_modal.hide();
-				}, 2500);
+				}, 1500);
 			}
-			loadData(true);
+			// loadData(true);
 		}
 		
 		/* AJAX DATA LOADING */
@@ -158,40 +160,51 @@
 		let ipCount = 0,
 		    left4refresh = 0;
 		function blockUnblock(addr, block=false) {
-			console.log("// TODO: send AJAX request to " + (block ? '' : 'un') + 'block ' + addr + ' from service #' + SERVICE_ID);
-			let ajax_error = "AJAX requests are<br>not implemented yet"; // Blank means no error
-			modalResult(ajax_error);
+            $.ajax({
+                type: "POST",
+                url: "../API/services/" + SERVICE_ID + '/blocked',
+                data: {"block": block, "ip_address": addr},
+                success: function(data) {
+                    loadData(true);
+                    modalResult(error_message=null, success_message="IP address " + (block ? '' : 'un') + "blocked<br>successfully");
+                },
+                error: function(err, _, _) {
+                    modalResult(error_message = "Couldn't " + (block ? '' : 'un') + "block IP<br>(" + err.status + " error)");
+                    loadData(true);
+                }
+            });
 		}
-        function loadIp (address, block_time) {
+        function loadIp (address, block_time, active) {
             ipPool.innerHTML +=
                 "                    <tr>\n" +
                 "                        <td>" + (++ipCount) + "</td>\n" +
                 "                        <td>" + address + "</td>\n" +
                 "                        <td>" + block_time + "</td>\n" +
-                '                        <td><a class="btn btn-primary" href="javascript:blockUnblock(\'' + address + '\')"><i class="bi bi-unlock me-2"></i>Unblock</a></td>\n' + // trash3
+                "                        <td>" + (active ? 'Active' : 'Unblocked') + "</td>\n" +
+                '                        <td' + (active ? '' : ' style="cursor: not-allowed;"') + '><a class="btn btn-' + (active ? 'primary' : 'secondary disabled') + '" href="javascript:blockUnblock(\'' + address + '\')"><i class="bi bi-unlock me-2"></i>Unblock</a></td>\n' + // trash3
                 "                    </tr>"
         }
         function loadData (manual=false) {
 			if (manual || left4refresh == 0) {
-				ipCount = 0;
-				ipPool.innerHTML = '';
-				let ajaxResult = [
-					['192.168.1.2', '12 minutes ago'],
-					['192.168.1.58', '10 minutes ago'],
-					['192.168.1.58', '20 minutes ago'],
-					['192.168.1.58', '30 minutes ago'],
-					['192.168.1.58', '40 minutes ago'],
-					['192.168.1.5', '50 minutes ago'],
-					['192.168.1.58', '20 minutes ago'],
-					['192.168.1.58', '30 minutes ago'],
-					['192.168.1.58', '40 minutes ago']
-				],  //TODO: get the blocked IPs via AJAX
-				nResults = ajaxResult.length;
-				nResults = Math.floor(Math.random() * nResults); // TODO: remove
-				for (let i=0; i<nResults; i++)
-					loadIp(ajaxResult[i][0], ajaxResult[i][1]);
-				noResults.className = 'text-center my-5 text-muted d-' + (nResults == 0 ? 'block' : 'none');
-				left4refresh = REFRESH_INTERVAL;
+				$.ajax({
+                    dataType: "json",
+                    url: "../API/services/" + SERVICE_ID + "/blocked",
+                    type: 'GET',
+                    success: function(data) {
+                        ipCount = 0;
+                        ipPool.innerHTML = '';
+                        for (let i = 0; i < data.length; i++)
+                            loadIp(data[i]['ip_address'], data[i]['blocked_at'], data[i]['active']);
+                        noResults.className = 'text-center my-5 text-muted d-' + (data.length == 0 ? 'block' : 'none');
+                        left4refresh = REFRESH_INTERVAL;
+                        countdown.innerHTML = Math.max(left4refresh, 0) + "";
+                    },
+                    error: function(err, _, _) {
+                        modalResult(error_message = "Couldn't load the list of<br>blocked IPs (" + err.status + ' error)<br><br><a class="btn btn-primary" href="javascript:window.location.reload(true);">Reload</a>');
+                        left4refresh = REFRESH_INTERVAL;
+                        countdown.innerHTML = Math.max(left4refresh, 0) + "";
+                    }
+                });
 			} else
 				left4refresh--;
 			countdown.innerHTML = Math.max(left4refresh, 0) + "";
