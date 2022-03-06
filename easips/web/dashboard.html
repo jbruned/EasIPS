@@ -1,0 +1,380 @@
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>EasIPS</title>
+    <link href="./assets/bootstrap.min.css" rel="stylesheet">
+    <link href="./assets/bootstrap-icons.css" rel="stylesheet">
+	<style>
+		button:disabled > span {
+			cursor: not-allowed;
+			pointer-events: auto;
+		}
+	</style>
+</head>
+
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#">EasIPS</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-content" aria-controls="navbar-content" aria-expanded="false" aria-label="Toggle menu"><span class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navbar-content">
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                    <li class="nav-item"><a class="nav-link btn text-light my-1" href="javascript:loadData(true)"><i class="bi bi-arrow-clockwise"></i></a></li>
+                    <li class="nav-item"><span class="nav-link text-light">Refreshing in <span id="countdown">5</span>s...</span></li>
+                    <li class="nav-item"><span class="nav-link">|</span></li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle text-light" id="admin-dropdown" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Admin</a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="admin-dropdown">
+                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#pmodal">Change password</a></li>
+                            <li><a class="dropdown-item" href="./logout">Log out</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="text-center my-4">
+            <h1>Welcome to EasIPS!</h1>
+            <p class="lead">An easy-to-use and customizable modular Intrusion Prevention System</p>
+        </div>
+        <hr class="my-4">
+        <div class="row">
+            <div class="col-md-8"><h2>My services</h2></div>
+            <div class="col-md-4 text-end"><a class="btn btn-primary" onclick="fillServiceSettings()" data-bs-toggle="modal" data-bs-target="#smodal"><i class="bi bi-plus-circle me-2"></i>Add service</a></div>
+        </div>
+        <div class="row" id="service-pool">
+        </div>
+    </main>
+
+	<div class="modal fade" id="success-modal" tabindex="-1" aria-labelledby="success-title" aria-hidden="true">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="text-center my-5 d-block">
+					<i class="bi bi-check2-circle h1 d-block text-success" id="success-icon"></i><span class="h3" id="success-title">Saved successfully!</span>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="modal fade" id="smodal" tabindex="-1" aria-labelledby="stitle" aria-hidden="true">
+		<div class="modal-dialog">
+			<form class="modal-content" action="./settings" method="POST" onsubmit="return saveServiceSettings(event, this)">
+				<div class="modal-header">
+					<h5 class="modal-title" id="stitle">Service settings</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+				  <div class="modal-body">
+					<div class="text-center my-5 d-block" id="sload">
+						<div class="spinner-border" role="status">
+							<span class="visually-hidden">Loading...</span>
+						</div>
+					</div>
+					<div id="sform" class="d-none">
+                        <div class="row mb-3">
+							<div class="col-sm-6">
+                                <label for="sname" class="form-label mb-0">Name</label>
+                                <input type="text" class="form-control" id="sname" name="name" placeholder="E.g.: Internal SSH Server">
+							</div>
+							<div class="col-sm-6">
+                                <label for="stype" class="form-label mb-0">Type</label>
+                                <select class="form-select" id="stype" name="service" required onchange="showHideWebPath()">
+                                    <option disabled></option>
+                                    <option value="ssh">SSH</option>
+                                    <option value="joomla">Joomla</option>
+                                    <option value="wordpress">WordPress</option>
+                                    <option value="phpmyadmin">phpMyAdmin</option>
+                                </select>
+							</div>
+						</div>
+						<div class="mb-3">
+							<label for="slogs" class="form-label mb-0">Log file location</label>
+							<input type="text" class="form-control" id="slogs" name="log_path">
+							<!--<div class="form-text mt-0">Leave empty to use the default path for the selected service</div>-->
+						</div>
+						<div class="mb-3 d-none" id="web-path">
+							<label for="spath" class="form-label mb-0">Web root path</label>
+							<input type="text" class="form-control" id="spath" name="web_path">
+							<!--<div class="form-text mt-0">Leave empty to use the default path for the selected service</div>-->
+						</div>
+						<div class="row mb-3">
+							<div class="col-sm-6">
+								<label for="sattempts" class="form-label mb-0">Maximum failed attempts</label>
+								<input type="number" class="form-control" id="sattempts" name="max_attempts" onchange="updateHint()" onkeyup="updateHint()" required>
+							</div>
+							<div class="col-sm-6">
+                                <label for="sthresh" class="form-label mb-0">Within threshold (mins)</label>
+                                <input type="number" class="form-control" id="sthresh" name="time_threshold" onchange="updateHint()" onkeyup="updateHint()" required>
+							</div>
+						</div>
+						<div class="mb-3">
+                            <label for="sduration" class="form-label mb-0">Block duration</label>
+                            <input type="number" class="form-control" id="sduration" name="block_duration" onchange="updateHint()" onkeyup="updateHint()">
+                            <div class="form-text mt-0">Leave empty to block permanently</div>
+						</div>
+						<div class="alert alert-primary text-center">If any IP exceeds <span id="hattempts">_</span> login attempts within <span id="hthresh">_</span> minutes, it will be blocked <span id="hduration">for _ minutes</span></div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+					<button type="submit" class="btn btn-primary" id="ssave" disabled><span>Save</span></button>
+				</div>
+			</form>
+		</div>
+	</div>
+	<div class="modal fade" id="pmodal" tabindex="-1" aria-labelledby="ptitle" aria-hidden="true">
+		<div class="modal-dialog">
+			<form class="modal-content" action="./password" method="POST" onsubmit="return changePassword(event)">
+				<div class="modal-header">
+					<h5 class="modal-title" id="ptitle">Change admin password</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+				<div class="modal-body">
+					<div class="mb-3">
+						<label for="pold" class="form-label">Old password</label>
+						<input type="password" class="form-control" id="pold" name="old" required>
+					</div>
+					<div class="mb-3">
+						<label for="pnew" class="form-label">New password</label>
+						<input type="password" class="form-control" id="pnew" name="new" required>
+					</div>
+					<div class="mb-3">
+						<label for="prepeat" class="form-label">Repeat password</label>
+						<input type="password" class="form-control" id="prepeat" name="repeat" required>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+					<button type="submit" class="btn btn-primary"><span>Save</span></button>
+				</div>
+			</form>
+		</div>
+	</div>
+	<div class="modal fade" id="confirm-delete" tabindex="-1" role="dialog" aria-labelledby="ctitle" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="ctitle">Confirmation</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to delete the selected service?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <a class="btn btn-danger" data-bs-dismiss="modal" onclick="confirmDeletion()">Delete</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="./assets/bootstrap.bundle.min.js"></script>
+    <script src="./assets/jquery-3.6.0.min.js"></script>
+
+    <script>
+
+        /* SUCCESS OR ERROR MESSAGE */
+		const success_modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('success-modal')),
+			  success_icon = document.getElementById('success-icon'),
+			  success_title = document.getElementById('success-title');
+		function modalResult(error_message = null, success_message = null) {
+			success_modal.show();
+			success_title.innerHTML = error_message || success_message || 'Saved successfully!';
+			if (error_message) {
+				success_icon.classList.remove('bi-check2-circle');
+				success_icon.classList.remove('text-danger');
+				success_icon.classList.add('bi-x-circle');
+				success_icon.classList.add('text-danger');
+			} else {
+				success_icon.classList.add('bi-check2-circle');
+				success_icon.classList.add('text-success');
+				success_icon.classList.remove('bi-x-circle');
+				success_icon.classList.remove('text-danger');
+				setTimeout(function() {
+					success_modal.hide();
+				}, 1500);
+			}
+			// loadData(true);
+		}
+		
+		/* AJAX DATA LOADING */
+        const servicePool = document.getElementById('service-pool'),
+		      countdown = document.getElementById('countdown'),
+              REFRESH_INTERVAL = 5; // In seconds
+		let left4refresh = 0;
+		function addService(id, name, running, blockednow, blocked24, lastblock) {
+			let is_running = !(running === 'false' || running == 0 || false);
+            servicePool.innerHTML +=
+                '            <div class="col-md-4">\n' +
+                '                <div class="card my-3">\n' +
+                '                    <div class="card-header d-flex justify-content-between align-items-center"><div>\n' +
+                '                        <h3 class="card-title m-0">' + name + '</h3>\n' +
+				'                        <span class="text-' + (is_running ? 'success' : 'danger') + '" style="margin-left: -4px"><i class="bi bi-' + (is_running ? 'play' : 'pause') + '-fill me-1"></i>' + (is_running ? 'Running' : 'Paused') + '</h3>\n' +
+                '                    </div><div class="btn-group-vertical" role="group" aria-label="Service options"><a class="btn btn-warning" href="javascript:playPause(' + id + ')"><i class="bi bi-' + (is_running ? 'pause' : 'play') + '-fill" style="margin: 0px -5px"></i></a><a class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#confirm-delete" onclick="setForDeletion(' + id + ')"><i class="bi bi-trash3-fill" style="margin: 0px -5px"></i></a></div></div>\n' +
+                '                    <div class="card-body">\n' +
+                '                        <p class="card-text mb-0"><i class="bi bi-circle-fill me-2 text-' + (blockednow == 0 ? 'success' : 'danger')  + '"></i>' + (blockednow || 'No') + ' currently blocked IP' + (blockednow == 1 ? '' : 's') + '</p>\n' +
+                '                        <p class="text-muted pt-0 ms-4">' + (lastblock ? ('Last block ' + lastblock) : 'No IPs blocked yet') + '</p>\n' +
+                '                        <p class="card-text"><i class="bi bi-circle-fill me-2 text-' + (blocked24 == 0 ? 'success' : 'danger')  + '"></i>' + (blocked24 || 'No') + ' blocked IP' + (blocked24 == 1 ? '' : 's') + ' in the last 24h</p>\n' +
+                '                    </div>\n' +
+                '                    <div class="btn-group rounded-bottom bg-primary" style="margin-bottom: -2px">\n' +
+                '                        <a class="btn btn-primary rounded-bottom rounded-0" data-bs-toggle="modal" data-bs-target="#smodal" onclick="loadServiceSettings(' + id + ')"><i class="bi bi-gear-fill me-2"></i>Settings</a>\n' +
+                '                        <a class="btn btn-primary rounded-bottom rounded-0" href="service/' + id + '"><i class="bi bi-list me-2"></i>Blocked IPs</a>\n' +
+                '                    </div>\n' +
+                '                </div>\n' +
+                '            </div>'
+        }
+        function loadData(manual=false) {
+			if (manual || left4refresh == 0) {
+                $.ajax({
+                    dataType: "json",
+                    url: "./API/services",
+                    type: 'GET',
+                    success: function(data) {
+                        servicePool.innerHTML = '';
+                        for (let i = 0; i < data.length; i++)
+                            addService(data[i]['id'], data[i]['name'], !data[i]['stopped'], data[i]['blocked_now'], data[i]['blocked_24h'], data[i]['last_blocked']);
+                        if (data.length == 0)
+                            servicePool.innerHTML = '<div class="text-center my-5 text-muted">No services have been created yet</div>';
+                        left4refresh = REFRESH_INTERVAL;
+                        countdown.innerHTML = Math.max(left4refresh, 0) + "";
+                    },
+                    error: function(err, _, _) {
+                        modalResult(error_message = "Couldn't load the service<br>list (" + err.status + ' error)<br><br><a class="btn btn-primary" href="javascript:window.location.reload(true);">Reload</a>');
+                        left4refresh = REFRESH_INTERVAL;
+                        countdown.innerHTML = Math.max(left4refresh, 0) + "";
+                    }
+                });
+			} else
+				left4refresh--;
+			countdown.innerHTML = Math.max(left4refresh, 0) + "";
+			if (!manual)
+				setTimeout(loadData, 1000);
+        }
+        loadData();
+		
+		/* AJAX DATA UPDATING */
+		const smodal = document.getElementById('smodal'),
+		      pmodal = document.getElementById('pmodal'),
+			  sload = document.getElementById('sload'),
+			  sform = document.getElementById('sform'),
+			  ssave = document.getElementById('ssave');
+        let editingService = null;
+		function fillServiceSettings(id = null, name = null, type = null, logs = null, path = null,
+		                             attempts = null, duration = null, threshold = null) {
+            editingService = id;
+            let isnew = id == null;
+            document.getElementById('sname').value = isnew ? '' : name;
+            document.getElementById('stype').value = isnew ? '' : type;
+            document.getElementById('slogs').value = isnew ? '' : logs;
+            document.getElementById('spath').value = isnew ? '' : path;
+            document.getElementById('sattempts').value = isnew ? '' : attempts;
+            document.getElementById('sduration').value = isnew ? '' : duration;
+            document.getElementById('sthresh').value = isnew ? '' : threshold;
+            showHideWebPath();
+            updateHint();
+			ssave.disabled = false;
+			sload.classList.replace('d-block', 'd-none');
+			sform.classList.replace('d-none', 'd-block');
+		}
+		function loadServiceSettings(id) {
+			sload.classList.replace('d-none', 'd-block');
+			sform.classList.replace('d-block', 'd-none');
+			ssave.disabled = true;
+			$.ajax({
+                dataType: "json",
+                url: "./API/services/" + id,
+                success: function(data) {
+                    fillServiceSettings(data['id'], data['name'], data['service'], data['log_path'],
+                                        data['web_path'], data['max_attempts'], data['block_duration'],
+                                        data['time_threshold']);
+                },
+                error: function(err, _, _) {
+                    bootstrap.Modal.getOrCreateInstance(smodal).hide();
+                    modalResult(error_message = "Couldn't load service settings (" + err.status + " error)");
+                }
+            });
+		}
+		function showHideWebPath() {
+            document.getElementById('web-path').className = document.getElementById('stype').value === 'ssh' ? 'mb-3 d-none' : 'mb-3';
+            document.getElementById('spath').required = document.getElementById('stype').value !== 'ssh';
+		}
+		function updateHint() {
+            document.getElementById('hthresh').innerHTML = document.getElementById('sthresh').value ?? '_';
+            document.getElementById('hattempts').innerHTML = document.getElementById('sattempts').value ?? '_';
+            let duration = document.getElementById('sduration').value;
+            document.getElementById('hduration').innerHTML = duration ? 'for ' + duration + ' minutes' : 'permanently';
+		}
+		function saveServiceSettings(e, form) {
+			e.preventDefault();
+			sload.classList.replace('d-none', 'd-block');
+			sform.classList.replace('d-block', 'd-none');
+			ssave.disabled = true;
+			$.ajax({
+                type: "POST",
+                data: $(form).serialize(),
+                url: "./API/services/" + (editingService ?? ''),
+                success: function(data) {
+                    bootstrap.Modal.getOrCreateInstance(smodal).hide();
+                    modalResult();
+                    loadData(true);
+                },
+                error: function(err, _, _) {
+                    bootstrap.Modal.getOrCreateInstance(smodal).hide();
+                    modalResult(error_message = "Couldn't save service settings (" + err.status + " error)");
+                    loadData(true);
+                }
+            });
+            editingService = null;
+		}
+		let deletionCandidate = null;
+		function setForDeletion(id) {
+            deletionCandidate = id;
+		}
+		function confirmDeletion() {
+            if (deletionCandidate == null)
+                return;
+            $.ajax({
+                dataType: "json",
+                url: "./API/services/" + deletionCandidate,
+                type: 'DELETE',
+                success: function(data) {
+                    modalResult(error_message = null, success_message = "Deleted successfully!");
+                },
+                error: function(err, _, _) {
+                    modalResult(error_message = "Couldn't delete (" + err.status + " error)");
+                    loadData(true);
+                }
+            })
+		}
+		function changePassword(e) {
+			e.preventDefault();
+			// TODO: send AJAX POST request
+			let ajax_error = "The auth system is not<br>implemented yet"; // Blank means no error
+			document.getElementById('pold').value = "";
+			document.getElementById('pnew').value = "";
+			document.getElementById('prepeat').value = "";
+			bootstrap.Modal.getOrCreateInstance(pmodal).hide();
+			modalResult(ajax_error);
+		}
+		function playPause(id) {
+			$.ajax({
+                type: "POST",
+                url: "./API/services/" + id + '/playpause',
+                success: function(data) {
+                    loadData(true);
+                },
+                error: function(err, _, _) {
+                    modalResult(error_message = "Couldn't toggle service's<br>state (" + err.status + " error)");
+                    loadData(true);
+                }
+            });
+		}
+
+    </script>
+
+</body>
+
+</html>
