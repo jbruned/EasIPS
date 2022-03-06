@@ -17,7 +17,7 @@ These settings can be adjusted from the web-based graphical user interface, wher
 
 ## Run instructions
 
-It's enough to run the `main.py` file with the python interpreter, given that the *PIP* dependencies (`requirements.txt`) are satisfied.
+It's enough to run the `main.py` file with the python interpreter, given that the *PIP* dependencies (`requirements.txt`) are satisfied. *Root* permissions are needed to open a socket for the web server.
 
 This script will run the application in the background, as well as the web *GUI*; the listening address and port can be specified in the call.
 
