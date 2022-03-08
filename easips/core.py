@@ -233,13 +233,30 @@ class ProtectedService:
     # language=regexp
     _SERVICES = {
         'joomla': [
-            r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}\tINFO\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\tjoomlafailure\t.*Username.*password.*not.*match.*',
+            [
+                # Detect joomla in error log
+                r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}\tINFO\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\tjoomlafailure\t.*Username.*password.*not.*match.*'
+            ],
             HTAccessLock],
-        'wordpress': ['regex', HTAccessLock],
+        'wordpress': [
+            [
+                # Detect specific apache log lines
+                r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*POST\s/wp-login\.php.*\s200\s\d+.*'
+            ],
+            HTAccessLock],
         'ssh': [
-            r'^\w{3}\s*\d{1,2}\s\d{2}:\d{2}:\d{2}\ssshserver.*Fail.*password.*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*',
+            [
+                # Detect in log from rsyslog
+                r'^\w{3}\s*\d{1,2}\s\d{2}:\d{2}:\d{2}\ssshserver.*repeated\s(\d+)\stimes.*Fail.*password.*\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*',
+                r'^\w{3}\s*\d{1,2}\s\d{2}:\d{2}:\d{2}\ssshserver.*Fail.*password.*\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*',
+            ],
             SSHLock],
-        'phpmyadmin': ['regex', HTAccessLock],
+        'phpmyadmin': [
+            [
+                # Detect specific apache log lines
+                r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*POST\s/index\.php.*\s200\s\d+.*'
+            ]
+            , HTAccessLock],
         # ...
     }
 
