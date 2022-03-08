@@ -16,11 +16,14 @@ services:
     depends_on:
       - phpmyadmindb
     image: phpmyadmin/phpmyadmin
-    volumes:
-      - "./webserver/log:/var/log"
+    build:
+      context: ./build/phpmyadmin
+      dockerfile: dockerfile
     restart: always
     ports:
       - '8082:80'
+    volumes:
+      - "./webserver:/var/www/html"
     environment:
       PMA_HOST: phpmyadmindb
       MYSQL_ROOT_PASSWORD: root 
