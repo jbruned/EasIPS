@@ -1,4 +1,4 @@
-from logsniffer import *
+from ..easips.logsniffer import *
 
 joomla_log_location = "../joomla/webserver/administrator/logs/error.php"
 # language=regexp
