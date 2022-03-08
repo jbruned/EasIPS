@@ -17,7 +17,7 @@ services:
       - wordpressdb
     image: wordpress:latest
     volumes:
-      - "./webserver:/var/www/html"
+      - "./webserver:/var"
     ports:
       - "8083:80"
     restart: always
@@ -26,4 +26,6 @@ services:
       WORDPRESS_DB_USER: user
       WORDPRESS_DB_PASSWORD: user
       WORDPRESS_DB_NAME: wordpressdb
+      WORDPRESS_DEBUG: 1
+      WORDPRESS_CONFIG_EXTRA: define( 'WP_DEBUG_LOG', true );
 
