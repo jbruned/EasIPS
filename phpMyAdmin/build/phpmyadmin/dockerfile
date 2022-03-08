@@ -1,0 +1,10 @@
+FROM phpmyadmin/phpmyadmin
+
+# Move the /var/ww/html to /tmp
+RUN mv /var/www/html /tmp/
+
+# Run the start up script that puts back /tmp to /var/www/html. This allows us to create an effective volume at ./webserver
+COPY ./custom-entrypoint.sh /custom-entrypoint.sh
+RUN chmod +x /custom-entrypoint.sh
+ENTRYPOINT ["/custom-entrypoint.sh"]
+CMD ["apache2-foreground"]
