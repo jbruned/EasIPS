@@ -7,6 +7,7 @@ from logging import getLogger, CRITICAL
 import datetime
 import json
 
+
 class WebGUI:
 
     def __init__(self, ips_instance):
@@ -21,24 +22,24 @@ class WebGUI:
         Migrate(self.app, db)
         db.create_all()
 
-        #if not ServiceSettings.query.all():
-        #db.session.add(ServiceSettings(
-                #id=1,
-                #name="Test service!",
-                #service="Joomla",
-                #time_threshold=1,
-                #max_attempts=10,
-                #block_duration=60,
-                #stopped = False
-            #))  # default: block for an hour after 10 tries in 1 minute
-        #db.session.commit()
-        #settings = ServiceSettings.query.order_by(ServiceSettings.id).first()
+        # if not ServiceSettings.query.all():
+        # db.session.add(ServiceSettings(
+        # id=1,
+        # name="Test service!",
+        # service="Joomla",
+        # time_threshold=1,
+        # max_attempts=10,
+        # block_duration=60,
+        # stopped = False
+        # ))  # default: block for an hour after 10 tries in 1 minute
+        # db.session.commit()
+        # settings = ServiceSettings.query.order_by(ServiceSettings.id).first()
 
         @self.app.route('/')
         def dashboard():
             return send_file("web/dashboard.html")
 
-        @self.app.route('/login', methods = ['GET', 'POST'])
+        @self.app.route('/login', methods=['GET', 'POST'])
         def login():
             if request.method == 'GET':
                 return send_file("web/login.html")
@@ -56,13 +57,13 @@ class WebGUI:
         def service(service_id):
             return send_file("web/service.html")
 
-        @self.app.route('/API/services/', methods = ['GET', 'POST'])
-        @self.app.route('/API/services/<service_id>', methods = ['GET', 'POST', 'DELETE'])
-        def api_service(service_id = None):
+        @self.app.route('/API/services/', methods=['GET', 'POST'])
+        @self.app.route('/API/services/<service_id>', methods=['GET', 'POST', 'DELETE'])
+        def api_service(service_id=None):
             try:
                 if request.method == 'GET':
                     return json.dumps(self.ips_instance.get_service(service_id).get_info()
-                        if service_id else self.ips_instance.get_services_info(), default=str)
+                                      if service_id else self.ips_instance.get_services_info(), default=str)
                 elif request.method == 'POST':
                     data = request.form
                     service_type = data['service'].lower()
@@ -90,7 +91,7 @@ class WebGUI:
             except NotFoundException:
                 abort(404)
 
-        @self.app.route('/API/services/<service_id>/playpause', methods = ['POST'])
+        @self.app.route('/API/services/<service_id>/playpause', methods=['POST'])
         def toggle_running(service_id):
             try:
                 self.ips_instance.get_service(service_id).toggleStopped()
@@ -99,7 +100,7 @@ class WebGUI:
             except NotFoundException:
                 abort(404)
 
-        @self.app.route('/API/services/<service_id>/blocked', methods = ['POST'])
+        @self.app.route('/API/services/<service_id>/blocked', methods=['POST'])
         def block_unblock(service_id):
             try:
                 service = self.ips_instance.get_service(service_id)
@@ -112,11 +113,11 @@ class WebGUI:
             except NotFoundException:
                 abort(404)
 
-        @self.app.route('/API/services/<service_id>/blocked', methods = ['GET'])
+        @self.app.route('/API/services/<service_id>/blocked', methods=['GET'])
         def blocked_ips(service_id):
             try:
                 return json.dumps(self.ips_instance.get_service(service_id).get_blocked_ips(
-                                  historic=True), default=str)
+                    historic=True), default=str)
             except NotFoundException:
                 abort(404)
 
