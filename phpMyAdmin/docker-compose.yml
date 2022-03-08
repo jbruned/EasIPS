@@ -23,7 +23,7 @@ services:
     ports:
       - '8082:80'
     volumes:
-      - "./webserver:/var/www/html"
+      - "./webserver:/var"
     environment:
       PMA_HOST: phpmyadmindb
       MYSQL_ROOT_PASSWORD: root 
