@@ -1,10 +1,9 @@
 import subprocess as sub
 from abc import ABC, abstractmethod
 from typing import Union
-from time import time
-from sys import stderr
 
-class ServiceLock (ABC):
+
+class ServiceLock(ABC):
     """
     This interface is used to implement adapters to block IPs from each of the required services
     """
@@ -35,7 +34,7 @@ class ServiceLock (ABC):
         raise NotImplementedError
 
 
-class SSHLock (ServiceLock):
+class SSHLock(ServiceLock):
     """
     This class is capable of (un)blocking IP addresses from a SSH server
     Note: root permissions are required to edit the required firewall settings
@@ -47,33 +46,33 @@ class SSHLock (ServiceLock):
             ip_addr = [ip_addr]
         for single_ip in ip_addr:
             sub.call(['ufw', 'insert', '1', 'deny', 'from', single_ip, 'to', 'any', 'port', '22', 'proto', 'tcp'])
-        return True # TODO Return True if system call is successful, False otherwise
+        return True  # TODO Return True if system call is successful, False otherwise
 
     def unblock(self, ip_addr: Union[str, list]) -> bool:
         # sudo ufw delete deny from IP_ADDRESS to any port 22 proto tcp
         if not isinstance(ip_addr, list):
             ip_addr = [ip_addr]
         for single_ip in ip_addr:
-            sub.call(['ufw', 'delete', 'deny', 'from', ip_addr, 'to', 'any', 'port', '22', 'proto', 'tcp'])
-        return True # TODO Return True if system call is successful, False otherwise
+            sub.call(['ufw', 'delete', 'deny', 'from', single_ip, 'to', 'any', 'port', '22', 'proto', 'tcp'])
+        return True  # TODO Return True if system call is successful, False otherwise
 
     @staticmethod
     def web_path_needed() -> bool:
         return False
 
 
-class HTAccessLock (ServiceLock):
+class HTAccessLock(ServiceLock):
     """
     This class is capable of (un)blocking IP addresses from a web service
     This method is based on modifying the .htaccess file on the desired path
     """
 
     def block(self, ip_addr: Union[str, list]) -> bool:
-        #TODO
+        # TODO
         return True
 
     def unblock(self, ip_addr: Union[str, list]) -> bool:
-        #TODO
+        # TODO
         return True
 
     @staticmethod

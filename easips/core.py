@@ -1,34 +1,37 @@
-from time import time, sleep
+from datetime import datetime, timedelta
+from time import sleep
+from typing import Union
+from warnings import warn
+
+from sqlalchemy import desc
+
 from easips.db import ServiceSettings, LoginAttempt, BlockedIP, db
 from easips.locks import SSHLock, HTAccessLock
 from easips.login_trackers import LogSniffer
-from datetime import datetime, timedelta
 from easips.util import ip_addr_is_valid, datetime_difference
-from typing import Union
-from warnings import warn
-import json
-from sqlalchemy import desc
 
 
 class ProtectedService:
 
     def __init__(self, settings: ServiceSettings):
         self.settings = settings
-        #ServiceSettings(
-            #id is auto increment by deafult
-            #name = name,
-            #service = service,
-            #time_threshold = time_threshold,
-            #max_attempts = max_attempts,
-            #block_duration = block_duration or None,
-            #log_path = log_path or None,
-            #stopped = False
-        #)
-        self.login_tracker = LogSniffer  # TODO: instantiate login watcher for specified service
-        self.lock = HTAccessLock()  # TODO: instantiate block for specified service
+        # ServiceSettings(
+        # id is auto increment by deafult
+        # name = name,
+        # service = service,
+        # time_threshold = time_threshold,
+        # max_attempts = max_attempts,
+        # block_duration = block_duration or None,
+        # log_path = log_path or None,
+        # stopped = False
+        # )
+        self.login_tracker = LogSniffer(settings.log_path, self._SERVICES[settings.service][0])
+        self.lock = SSHLock()  # TODO: instantiate block for specified service
         self.KEEP_HISTORY = True  # If True, old login attempt and blocked IP are kept for history reasons
 
     def iteration(self, db):
+        for log_attempt in self.login_tracker.poll():
+            self.log_attempt(log_attempt, db)
         self.refresh(db)
 
     def persist_settings(self, db):
@@ -43,26 +46,27 @@ class ProtectedService:
         """
         This method logs when an IP has made a login attempt. If this attempt violates the set constraints, it will be blocked.
         This method also takes care of removing the blocked addresses in due time.
-        :param ip: str -> The IP address that has attempted to log in
+        :param ip_addr: str -> The IP address that has attempted to log in
+        :param db: database instance.
         :param timestamp: datetime | None -> The moment at which this IP has tried to log in, and thus the moment to be considered in processing it. Defaults to current time
         """
         timestamp = timestamp or datetime.now()
 
-        if not ip_addr_is_valid(ip):
-            warn(f"[Warning] {ip} is not a valid IP address to log")
-        elif self.is_blocked(ip_addr, timestamp):
+        if not ip_addr_is_valid(ip_addr):
+            warn(f"[Warning] {ip_addr} is not a valid IP address to log")
+        elif self.is_blocked(ip_addr):
             print(f"[Warning] {ip_addr} is supposed to be blocked from '{self.settings.name}' "
                   "but a login attempt has been detected")
         else:
             db.session.add(LoginAttempt(
-                service_id = self.settings.id,
-                ip_addr = ip_addr,
-                timestamp = timestamp
+                service_id=self.settings.id,
+                ip_addr=ip_addr,
+                timestamp=timestamp
             ))
             db.session.commit()  # log failed attempt
 
         if self.has_exceeded_attempts(ip_addr, timestamp):
-            self.block(ip_addr, timestamp)
+            self.block(ip_addr, db, timestamp)
 
     def has_exceeded_attempts(self, ip_addr: str, timestamp: Union[datetime, None] = None) -> bool:
         """
@@ -72,8 +76,8 @@ class ProtectedService:
         return len(LoginAttempt.query.filter(
             LoginAttempt.service_id == self.settings.id,
             LoginAttempt.ip_addr == ip_addr,
-            LoginAttempt.timestamp >= timestamp - timedelta(minutes = self.settings.time_threshold)
-        ).all()) >= self.settings.tries
+            LoginAttempt.timestamp >= timestamp - timedelta(minutes=self.settings.time_threshold)
+        ).all()) >= self.settings.max_attempts
 
     def block(self, ip_addr: Union[str, list], db, timestamp: Union[datetime, None] = None):
         """
@@ -91,20 +95,20 @@ class ProtectedService:
                 obj = BlockedIP.query.filter(BlockedIP.service_id == self.settings.id, BlockedIP.ip_addr == ip_addr,
                                              BlockedIP.active == True).first()
                 obj.blocked_at = timestamp
-                #db.session.add(obj)
+                # db.session.add(obj)
                 db.session.commit()
                 print(f"[Info] {ip_addr} was already blocked from '{self.settings.name}', time is now updated")
             elif self.lock.block(ip_addr):
                 db.session.add(BlockedIP(
-                    service_id = self.settings.id,
-                    ip_addr = ip_addr,
-                    blocked_at = timestamp,
-                    active = True
+                    service_id=self.settings.id,
+                    ip_addr=ip_addr,
+                    blocked_at=timestamp,
+                    active=True
                 ))
                 db.session.commit()
                 print(f"[Info] {ip_addr} has been successfully blocked from service '{self.settings.name}'")
             else:
-                print(f"[Error] {ip_addr} couldn't be blocked from service '{self.settings.name}'", file=stderr)
+                print(f"[Error] {ip_addr} couldn't be blocked from service '{self.settings.name}'")
 
     def unblock(self, ip_addr: Union[str, list], db, timestamp: Union[datetime, None] = None):
         """
@@ -134,15 +138,15 @@ class ProtectedService:
                 db.session.commit()
                 print(f"[Info] {ip_addr} has been successfully unblocked from service '{self.settings.name}'")
             else:
-                print(f"[Error] {ip_addr} couldn't be unblocked from service '{self.settings.name}'", file=stderr)
+                print(f"[Error] {ip_addr} couldn't be unblocked from service '{self.settings.name}'")
 
-    def is_blocked(self, ip_addr: Union[str, list]) -> Union [bool, list]:
+    def is_blocked(self, ip_addr: Union[str, list]) -> Union[bool, list]:
         """
         Determines if the IP address(es) are blocked from the specified service.
         If :param moment: is provided, it will also update the time of said block to the provided moment.
         """
         if isinstance(ip_addr, list):
-            return [self.is_blocked(single_ip, moment) for single_ip in ip_addr]
+            return [self.is_blocked(single_ip) for single_ip in ip_addr]
         ip_addr = ip_addr.lower()
 
         if not ip_addr_is_valid(ip_addr):
@@ -150,7 +154,7 @@ class ProtectedService:
             return False
 
         return len(BlockedIP.query.filter(BlockedIP.service_id == self.settings.id, BlockedIP.ip_addr == ip_addr,
-                                          BlockedIP.active == True).all()) > 0
+                                          BlockedIP.active).all()) > 0
 
     def refresh(self, db, timestamp: Union[datetime, None] = None):
         """
@@ -163,20 +167,23 @@ class ProtectedService:
         # Remove old login attempts that have exceeded the time threshold
         if not self.KEEP_HISTORY:
             LoginAttempt.query.filter(
-                LoginAttempt.timestamp < timestamp - timedelta(minutes = self.settings.time_threshold)
+                LoginAttempt.timestamp < timestamp - timedelta(minutes=self.settings.time_threshold)
             ).delete()  # remove old tries
             db.session.commit()
 
         # If the block isn't permanent, unblock IPs that have already exceeded the block duration
         if self.settings.block_duration:
             expired = BlockedIP.query.filter(BlockedIP.service_id == self.settings.id, BlockedIP.active == True,
-                                             BlockedIP.blocked_at < timestamp - timedelta(minutes = self.settings.block_duration))
+                                             BlockedIP.blocked_at < timestamp - timedelta(
+                                                 minutes=float(self.settings.block_duration)))
             for e in expired.all():
-                #if e.active:  # For some reason inactive IPs come out despite the BlockedIP.active == True condition ¿?¿?
+                # if e.active:  # For some reason inactive IPs come out despite the BlockedIP.active == True condition ¿?¿?
                 self.unblock(e.ip_addr, db, timestamp)
 
     def toggleStopped(self):
-        ''' For the changes to be permanent, the persist_settings() method needs to be called afterwards '''
+        """
+        For the changes to be permanent, the persist_settings() method needs to be called afterwards
+        """
         self.settings.stopped = not self.settings.stopped
 
     def get_blocked_ips(self, last_24h: bool = False, historic: bool = False):
@@ -185,18 +192,19 @@ class ProtectedService:
             blocked_ips = BlockedIP.query.filter(BlockedIP.service_id == self.settings.id)
         elif last_24h:
             blocked_ips = BlockedIP.query.filter(BlockedIP.service_id == self.settings.id,
-                                                 BlockedIP.blocked_at >= timestamp - timedelta(minutes = 60 * 24))
+                                                 BlockedIP.blocked_at >= timestamp - timedelta(minutes=60 * 24))
         else:  # Currently blocked IPs
             blocked_ips = BlockedIP.query.filter(BlockedIP.service_id == self.settings.id,
-                                                 BlockedIP.active == True)  #, BlockedIP.blocked_at >=
-                                                 #timestamp - timedelta(minutes = self.settings.block_duration))
+                                                 BlockedIP.active == True)  # , BlockedIP.blocked_at >=
+            # timestamp - timedelta(minutes = self.settings.block_duration))
         return [
             {'ip_address': single_ip.ip_addr, 'blocked_at': single_ip.blocked_at, 'active': single_ip.active}
             for single_ip in blocked_ips.order_by(desc(BlockedIP.blocked_at))
         ]
 
     def get_last_blocked(self):
-        result = BlockedIP.query.filter(BlockedIP.service_id == self.settings.id).order_by(desc(BlockedIP.blocked_at)).first()
+        result = BlockedIP.query.filter(BlockedIP.service_id == self.settings.id).order_by(
+            desc(BlockedIP.blocked_at)).first()
         return None if result is None else result.blocked_at
 
     def get_info(self):
@@ -211,7 +219,7 @@ class ProtectedService:
             'web_path': self.settings.web_path,
             'stopped': self.settings.stopped,
             'blocked_now': len(self.get_blocked_ips()),
-            'blocked_24h': len(self.get_blocked_ips(last_24h = True)),
+            'blocked_24h': len(self.get_blocked_ips(last_24h=True)),
             'last_blocked': datetime_difference(self.get_last_blocked())
         }
 
@@ -222,52 +230,63 @@ class ProtectedService:
         db.session.commit()
         self.settings = None
 
+    # language=regexp
     _SERVICES = {
-        'joomla': ['regex', HTAccessLock],
+        'joomla': [
+            r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}\tINFO\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\tjoomlafailure\t.*Username.*password.*not.*match.*',
+            HTAccessLock],
         'wordpress': ['regex', HTAccessLock],
-        'ssh': ['regex', SSHLock],
+        'ssh': [
+            r'^\w{3}\s*\d{1,2}\s\d{2}:\d{2}:\d{2}\ssshserver.*Fail.*password.*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*',
+            SSHLock],
         'phpmyadmin': ['regex', HTAccessLock],
         # ...
     }
 
     @staticmethod
     def is_service_valid(service_name: str, log_path: str = None, web_path: str = None):
-        ''' Checks if the desired service is supported '''
+        """
+        Checks if the desired service is supported
+        """
         return service_name in ProtectedService._SERVICES.keys() and (web_path is not None
-            or not ProtectedService._SERVICES[service_name][1].web_path_needed())
+                                                                      or not ProtectedService._SERVICES[service_name][
+                    1].web_path_needed())
 
 
-class NotFoundException (Exception):
+class NotFoundException(Exception):
     pass
 
 
 class BackgroundIPS:
+    """
+    Background process which initiates the watching of log files
+    """
 
     def __init__(self):
         self.services = []
-        #self.next_id = 1
+        # self.next_id = 1
         self.admin_pwd = 'EasIPS'
         self.delta_t = 0.5
         self.db = db
 
-    #def set_db(self, db):
-        #self.db = db
+    # def set_db(self, db):
+    # self.db = db
 
     def load_db(self):
         for s in ServiceSettings.query.all():
-            self.add_service(s, new = False)
+            self.add_service(s, new=False)
 
     def add_service(self, settings: ServiceSettings, new: bool = True):
-        #self.settings = ServiceSettings(
-            #id is auto increment by deafult
-            #name = name,
-            #service = service,
-            #time_threshold = time_threshold,
-            #max_attempts = max_attempts,
-            #block_duration = block_duration or None,
-            #log_path = log_path or None,
-            #stopped = False
-        #)
+        # self.settings = ServiceSettings(
+        # id is auto increment by deafult
+        # name = name,
+        # service = service,
+        # time_threshold = time_threshold,
+        # max_attempts = max_attempts,
+        # block_duration = block_duration or None,
+        # log_path = log_path or None,
+        # stopped = False
+        # )
         service = ProtectedService(settings)
         self.services.append(service)
         if new:
