@@ -24,10 +24,16 @@ class WebGUI:
         Migrate(self.app, db)
         db.create_all()
 
+        def get_hashed_password(password: str) -> str:
+            return password  # TODO: get actual password hash
+
+        def is_password_correct(password: str) -> bool:
+            return password == self.settings.admin_password  # TODO: check password hash instead
+
         settings_query = AppSettings.query
         if not settings_query.all():
             db.session.add(AppSettings(
-                admin_password="admin"  # TODO: hash
+                admin_password=get_hashed_password("admin")
             ))  # default password is admin
             db.session.commit()
         self.settings = AppSettings.query.first()
@@ -41,9 +47,19 @@ class WebGUI:
 
         @self.app.route('/login', methods=['POST'])
         def login():
-            if request.form['password'] == self.settings.admin_password:  # TODO: check password hash instead
+            if is_password_correct(request.form['password']):
                 pass  # TODO: start user session
             return redirect("/")
+
+        @self.app.route('/API/password', methods=['POST'])
+        def change_password():
+            if not request.form['old'] or not not request.form['new'] or not request.form['repeat'] \
+                    or request.form['new'] != request.form['repeat']:
+                abort(400)
+            if not is_password_correct(request.form['old']):
+                abort(401)
+            self.settings.admin_password = get_hashed_password(request.form['new'])
+            db.session.commit()
 
         @self.app.route('/logout')
         def logout():
