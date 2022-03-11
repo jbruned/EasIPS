@@ -100,6 +100,8 @@ class WebGUI:
                     s.block_duration = data['block_duration'] or None
                     s.log_path = data['log_path'] or None
                     s.web_path = data['web_path'] or None
+                    if not service_id:
+                        s.stopped = False
                     try:
                         if service_id:
                             self.ips_instance.get_service(service_id).flag_as_modified()
