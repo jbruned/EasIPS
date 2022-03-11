@@ -5,6 +5,7 @@ const success_modal = bootstrap.Modal.getOrCreateInstance(document.getElementByI
 function modalResult(error_message = null, success_message = null) {
     success_modal.show();
     success_title.innerHTML = error_message || success_message || 'Saved successfully!';
+    success_title.className = success_title.innerText.length > 55 ? 'h5' : 'h3';
     if (error_message) {
         success_icon.classList.remove('bi-check2-circle');
         success_icon.classList.remove('text-danger');
@@ -63,8 +64,11 @@ function loadData(manual=false) {
                 left4refresh = REFRESH_INTERVAL;
                 countdown.innerHTML = Math.max(left4refresh, 0) + "";
             },
-            error: function(err, _, _) {
-                modalResult(error_message = "Couldn't load the service<br>list (" + err.status + ' error)<br><br><a class="btn btn-primary" href="javascript:window.location.reload(true);">Reload</a>');
+            error: function(err, _, __) {
+                let error = "Couldn't load the service<br>list (" + err.status + ' error)';
+                if (err.status == 0)
+                    error = "Couldn't connect to the server, is it running?";
+                modalResult(error + '<br><br><a class="btn btn-primary" href="javascript:window.location.reload(true);">Reload</a>');
                 left4refresh = REFRESH_INTERVAL;
                 countdown.innerHTML = Math.max(left4refresh, 0) + "";
             }
@@ -113,9 +117,9 @@ function loadServiceSettings(id) {
                                 data['web_path'], data['max_attempts'], data['block_duration'],
                                 data['time_threshold']);
         },
-        error: function(err, _, _) {
+        error: function(err, _, __) {
             bootstrap.Modal.getOrCreateInstance(smodal).hide();
-            modalResult(error_message = "Couldn't load service settings (" + err.status + " error)");
+            modalResult("Couldn't load service settings (" + err.status + " error)");
         }
     });
 }
@@ -143,9 +147,12 @@ function saveServiceSettings(e, form) {
             modalResult();
             loadData(true);
         },
-        error: function(err, _, _) {
+        error: function(err, _, __) {
             bootstrap.Modal.getOrCreateInstance(smodal).hide();
-            modalResult(error_message = "Couldn't save service settings (" + err.status + " error)");
+            let error = "Couldn't save service settings (" + err.status + " error)";
+            if (err.status === 418)
+                error = "The service was stopped due to invalid configuration. A possible cause could be that the specified paths/files don't exist or you don't have write permission.";
+            modalResult(error);
             loadData(true);
         }
     });
@@ -163,10 +170,10 @@ function confirmDeletion() {
         url: "./API/services/" + deletionCandidate,
         type: 'DELETE',
         success: function(data) {
-            modalResult(error_message = null, success_message = "Deleted successfully!");
+            modalResult(null, "Deleted successfully!");
         },
-        error: function(err, _, _) {
-            modalResult(error_message = "Couldn't delete (" + err.status + " error)");
+        error: function(err, _, __) {
+            modalResult("Couldn't delete (" + err.status + " error)");
             loadData(true);
         }
     })
@@ -188,8 +195,11 @@ function playPause(id) {
         success: function(data) {
             loadData(true);
         },
-        error: function(err, _, _) {
-            modalResult(error_message = "Couldn't toggle service's<br>state (" + err.status + " error)");
+        error: function(err, _, __) {
+            let error = "Couldn't toggle service's state (" + err.status + " error)";
+            if (err.status === 418)
+                error = "Couldn't start service, a possible cause could be that the specified paths/files don't exist or you don't have write permission.";
+            modalResult(error);
             loadData(true);
         }
     });

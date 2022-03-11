@@ -8,7 +8,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import desc
 
 from easips.db import ServiceSettings, LoginAttempt, BlockedIP
-from easips.locks import ServiceLock, SSHLock, HTAccessLock
+from easips.locks import ServiceLock, HTAccessLock, FirewallLock
 from easips.login_trackers import LoginTracker, LogSniffer
 from easips.util import ip_addr_is_valid, datetime_difference, InvalidSettingsException, NotFoundException
 
@@ -35,7 +35,7 @@ class ProtectedService:
         """
         try:
             self.login_tracker = LogSniffer(self.settings.log_path, self._SERVICES[self.settings.service][0])
-            self.lock = SSHLock()  # TODO: instantiate depending on settings or throw InvalidSettingsException
+            self.lock = FirewallLock(22)  # TODO: instantiate depending on settings or throw InvalidSettingsException
         except:
             self.login_tracker = None
             self.lock = None
@@ -293,7 +293,7 @@ class ProtectedService:
                 r'^\w{3}\s*\d{1,2}\s\d{2}:\d{2}:\d{2}\ssshserver.*repeated\s(\d+)\stimes.*Fail.*password.*\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*',
                 r'^\w{3}\s*\d{1,2}\s\d{2}:\d{2}:\d{2}\ssshserver.*Fail.*password.*\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*',
             ],
-            SSHLock],
+            FirewallLock],
         'phpmyadmin': [
             [
                 # Detect specific apache log lines
@@ -308,9 +308,7 @@ class ProtectedService:
         """
         Checks if the desired service is supported
         """
-        return service_name in ProtectedService._SERVICES.keys() and (web_path is not None
-                                                                      or not ProtectedService._SERVICES[service_name][
-                    1].web_path_needed())
+        return service_name in ProtectedService._SERVICES.keys()  # TODO: proper validation
 
 
 class BackgroundIPS:
@@ -326,12 +324,11 @@ class BackgroundIPS:
 
     def load_db(self):
         for s in ServiceSettings.query.all():
-            self.add_service(s, new=False)
+            self.add_service(s)
 
-    def add_service(self, settings: ServiceSettings, new: bool = True):
+    def add_service(self, settings: ServiceSettings):
         service = ProtectedService(settings)
         self.services.append(service)
-        # if new:
         try:
             service.flag_as_modified()
         except InvalidSettingsException:
@@ -345,7 +342,7 @@ class BackgroundIPS:
 
     def del_service(self, service_id: int):
         s = self.get_service(service_id)
-        s.settings.stopped = True  # TODO: s.stop()
+        s.settings.stopped = True
         s.delete(self.db)
         self.services.remove(s)
 
