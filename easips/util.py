@@ -1,3 +1,4 @@
+import subprocess
 from ipaddress import ip_address
 from datetime import datetime
 
@@ -8,6 +9,13 @@ class NotFoundException(Exception):
 
 class InvalidSettingsException(Exception):
     pass
+
+
+def system_call(command: str, show_output: bool = False) -> bool:
+    """
+    Performs a system call using a bash command and returns True if successful (if the return code is 0)
+    """
+    return subprocess.run(command.split(' '), capture_output=not show_output).returncode == 0
 
 
 def datetime_difference(a: datetime, b: datetime = None) -> str:

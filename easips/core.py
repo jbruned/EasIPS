@@ -308,9 +308,7 @@ class ProtectedService:
         """
         Checks if the desired service is supported
         """
-        return service_name in ProtectedService._SERVICES.keys() and (web_path is not None
-                                                                      or not ProtectedService._SERVICES[service_name][
-                    1].web_path_needed())
+        return service_name in ProtectedService._SERVICES.keys()  # TODO: proper validation
 
 
 class BackgroundIPS:
@@ -326,12 +324,11 @@ class BackgroundIPS:
 
     def load_db(self):
         for s in ServiceSettings.query.all():
-            self.add_service(s, new=False)
+            self.add_service(s)
 
-    def add_service(self, settings: ServiceSettings, new: bool = True):
+    def add_service(self, settings: ServiceSettings):
         service = ProtectedService(settings)
         self.services.append(service)
-        # if new:
         try:
             service.flag_as_modified()
         except InvalidSettingsException:
@@ -345,7 +342,7 @@ class BackgroundIPS:
 
     def del_service(self, service_id: int):
         s = self.get_service(service_id)
-        s.settings.stopped = True  # TODO: s.stop()
+        s.settings.stopped = True
         s.delete(self.db)
         self.services.remove(s)
 

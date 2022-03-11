@@ -1,6 +1,8 @@
 import subprocess as sub
 from abc import ABC, abstractmethod
 from typing import Union
+from easips.util import system_call
+from shutil import copyfile
 
 
 class ServiceLock(ABC):
@@ -24,41 +26,32 @@ class ServiceLock(ABC):
         """
         raise NotImplementedError
 
-    @staticmethod
-    @abstractmethod
-    def web_path_needed() -> bool:
-        """
-        This static method returns True if the lock needs the root path of the web
-        (e.g.: to create a .htaccess file), and False otherwise
-        """
-        raise NotImplementedError
 
-
-class SSHLock(ServiceLock):
+class FirewallLock(ServiceLock):
     """
-    This class is capable of (un)blocking IP addresses from a SSH server
+    This class is capable of (un)blocking IP addresses portwise
     Note: root permissions are required to edit the required firewall settings
     """
 
+    def __init__(self, port: Union[int, str], protocol: str = "tcp"):
+        self.port = port
+        self.proto = protocol
+
     def block(self, ip_addr: Union[str, list]) -> bool:
-        # sudo ufw insert 1 deny from IP_ADDRESS to any port 22 proto tcp
         if not isinstance(ip_addr, list):
             ip_addr = [ip_addr]
+        success = True
         for single_ip in ip_addr:
-            sub.call(['ufw', 'insert', '1', 'deny', 'from', single_ip, 'to', 'any', 'port', '22', 'proto', 'tcp'])
-        return True  # TODO Return True if system call is successful, False otherwise
+            success &= system_call(f"ufw insert 1 deny from {single_ip} to any port {self.port} proto {self.proto}")
+        return success
 
     def unblock(self, ip_addr: Union[str, list]) -> bool:
-        # sudo ufw delete deny from IP_ADDRESS to any port 22 proto tcp
         if not isinstance(ip_addr, list):
             ip_addr = [ip_addr]
+        success = True
         for single_ip in ip_addr:
-            sub.call(['ufw', 'delete', 'deny', 'from', single_ip, 'to', 'any', 'port', '22', 'proto', 'tcp'])
-        return True  # TODO Return True if system call is successful, False otherwise
-
-    @staticmethod
-    def web_path_needed() -> bool:
-        return False
+            success &= system_call(f"ufw delete deny from {single_ip} to any port {self.port} proto {self.proto}")
+        return success
 
 
 class HTAccessLock(ServiceLock):
@@ -67,14 +60,146 @@ class HTAccessLock(ServiceLock):
     This method is based on modifying the .htaccess file on the desired path
     """
 
+    def __init__(self, web_path: str):
+        if web_path[-1] != '/' and web_path[-1] != '\\':
+            web_path += '/'
+        self.path = web_path + '.htaccess'
+
     def block(self, ip_addr: Union[str, list]) -> bool:
-        # TODO
-        return True
+        if not isinstance(ip_addr, list):
+            ip_addr = [ip_addr]
+        ip_addr = [x.strip().lower() for x in ip_addr]
+        ip_found = [False for _ in ip_addr]
+        error_doc_found = False
+        try:
+            rest_of_file = ""
+            try:
+                f = open(self.path, "r")
+                new_contents = ""
+                order_found = False
+                allow_found = False
+                for line in f:
+                    if line.strip() == "":
+                        continue
+                    elif not order_found:
+                        if 'order ' in line.lower():
+                            order_found = True
+                            new_contents += "Order allow,deny\n"
+                    elif not allow_found:
+                        new_contents += "Allow from all\n"
+                        allow_found = True
+                    else:
+                        if "Deny from " in line:
+                            for i in range(len(ip_addr)):
+                                if ip_addr[i] in line:
+                                    ip_found[i] = True
+                            new_contents += line
+                        else:
+                            rest_of_file += line
+                    if "ErrorDocument 403 " in line:
+                        new_contents += "ErrorDocument 403 blocked.html\n"
+                        error_doc_found = True
+                f.close()
+            except FileNotFoundError:
+                new_contents = "Order allow,deny\nAllow from all\n"
+            for found, single_ip in zip(ip_found, ip_addr):
+                if not found:
+                    new_contents += f"Deny from {single_ip}\n"
+            if not error_doc_found:
+                new_contents += "ErrorDocument 403 blocked.html\n"
+            copyfile(self.path.replace('.htaccess', 'blocked.html'), "web/blocked.html")
+            new_contents += rest_of_file
+            f = open(self.path, "w")
+            f.write(new_contents)
+            f.close()
+            return True
+        except:
+            return False
 
     def unblock(self, ip_addr: Union[str, list]) -> bool:
-        # TODO
-        return True
+        if not isinstance(ip_addr, list):
+            ip_addr = [ip_addr]
+        ip_addr = [x.strip().lower() for x in ip_addr]
+        try:
+            f = open(self.path, "r")
+            new_contents = ""
+            for line in f:
+                for single_ip in ip_addr:
+                    if single_ip not in line or "Deny from " not in line:
+                        new_contents += line
+            f.close()
+            f = open(self.path, "w")
+            f.write(new_contents)
+            f.close()
+            return True
+        except FileNotFoundError:
+            return True
+        except:
+            return False
 
-    @staticmethod
-    def web_path_needed() -> bool:
-        return True
+
+class EtcHostsLock(ServiceLock):
+    """
+    This class is capable of (un)blocking IP addresses from any daemon
+    This method is based on modifying the /etc/hosts.deny file (which needs root access)
+    """
+
+    def __init__(self, service_daemon_name: str, etc_hosts_deny_path: str = "/etc/hosts.deny"):
+        self.daemon = service_daemon_name
+        self.path = etc_hosts_deny_path
+
+    def block(self, ip_addr: Union[str, list]) -> bool:
+        if not isinstance(ip_addr, list):
+            ip_addr = [ip_addr]
+        try:
+            new_contents = ""
+            written = False
+            try:
+                f = open(self.path, "r")
+                for line in f:
+                    if self.daemon + ' :' in line or self.daemon + ':' in line:
+                        written = True
+                        ips = [x.strip().lower() for x in line.split(':', 2)[-1].split(',')]
+                        for single_ip in ip_addr:
+                            single_ip = single_ip.strip().lower()
+                            if single_ip not in ips:
+                                line += f", {single_ip}"
+                    new_contents += line
+                f.close()
+            except FileNotFoundError:
+                pass
+            if not written:
+                new_contents += self.daemon + ' : ' + ', '.join([x.strip().lower() for x in ip_addr])
+            f = open(self.path, "w")
+            f.write(new_contents)
+            f.close()
+            return True
+        except:
+            return False
+
+    def unblock(self, ip_addr: Union[str, list]) -> bool:
+        if not isinstance(ip_addr, list):
+            ip_addr = [ip_addr]
+        try:
+            f = open(self.path, "r")
+            new_contents = ""
+            for line in f:
+                if self.daemon + ' :' in line or self.daemon + ':' in line:
+                    ips = [x.strip().lower() for x in line.split(':', 2)[-1].split(',')]
+                    for single_ip in ip_addr:
+                        single_ip = single_ip.strip().lower()
+                        if single_ip in ips:
+                            ips.remove(single_ip)
+                    if len(ips) < 1:
+                        continue
+                    line = self.daemon + ' : ' + ', '.join(ips)
+                new_contents += line
+            f.close()
+            f = open(self.path, "w")
+            f.write(new_contents)
+            f.close()
+            return True
+        except FileNotFoundError:
+            return True
+        except:
+            return False
