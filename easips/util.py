@@ -2,6 +2,14 @@ from ipaddress import ip_address
 from datetime import datetime
 
 
+class NotFoundException(Exception):
+    pass
+
+
+class InvalidSettingsException(Exception):
+    pass
+
+
 def datetime_difference(a: datetime, b: datetime = None) -> str:
     """
     Returns human-readable difference between two datetimes (b defaults to now)

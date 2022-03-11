@@ -3,6 +3,12 @@ from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy()
 
 
+class AppSettings(db.Model):
+    __tablename__ = "settings"
+    id = db.Column(db.Integer, primary_key=True)
+    admin_password = db.Column(db.String(50), nullable=False)  # e.g.: Public Blog Server / Internal SSH Server
+
+
 class ServiceSettings(db.Model):
     __tablename__ = "services"
     id = db.Column(db.Integer, primary_key=True)
