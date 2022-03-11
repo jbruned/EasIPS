@@ -23,6 +23,7 @@ Website to access PHPMyAdmin webserver:
 Use the following login information:
 Username: 
 > root
+
 Password:
 > root
 

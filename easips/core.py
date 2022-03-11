@@ -36,11 +36,12 @@ class ProtectedService:
         try:
             self.login_tracker = LogSniffer(self.settings.log_path, self._SERVICES[self.settings.service][0])
             self.lock = FirewallLock(22)  # TODO: instantiate depending on settings or throw InvalidSettingsException
-        except:
+        except Exception as e:
             self.login_tracker = None
             self.lock = None
             if not self.settings.stopped:
                 self.toggle_stopped(True)
+            print(e)
             print(f"[Error] Couldn't initialize service '{self.settings.name}', thus it has been stopped", file=stderr)
             raise InvalidSettingsException
 
@@ -278,7 +279,7 @@ class ProtectedService:
         'joomla': (
             [
                 # Detect joomla in error log
-                r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}\tINFO\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\tjoomlafailure\t.*Username.*password.*not.*match.*'
+                r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}.*INFO\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*joomlafailure.*Username.*password.*not.*match.*'
             ],
             HTAccessLock),
         'wordpress': (
