@@ -1,3 +1,7 @@
+[].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]')).map(function (tooltipTriggerEl) {
+  return new bootstrap.Tooltip(tooltipTriggerEl)
+})
+
 /* SUCCESS OR ERROR MESSAGE */
 const success_modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('success-modal')),
         success_icon = document.getElementById('success-icon'),
@@ -83,10 +87,10 @@ loadData();
 
 /* AJAX DATA UPDATING */
 const smodal = document.getElementById('smodal'),
-        pmodal = document.getElementById('pmodal'),
-        sload = document.getElementById('sload'),
-        sform = document.getElementById('sform'),
-        ssave = document.getElementById('ssave');
+      pmodal = document.getElementById('pmodal'),
+      sload = document.getElementById('sload'),
+      sform = document.getElementById('sform'),
+      ssave = document.getElementById('ssave');
 let editingService = null;
 function fillServiceSettings(id = null, name = null, type = null, logs = null, path = null,
                                 attempts = null, duration = null, threshold = null) {
@@ -94,12 +98,14 @@ function fillServiceSettings(id = null, name = null, type = null, logs = null, p
     let isnew = id == null;
     document.getElementById('sname').value = isnew ? '' : name;
     document.getElementById('stype').value = isnew ? '' : type;
+    selectService();
     document.getElementById('slogs').value = isnew ? '' : logs;
     document.getElementById('spath').value = isnew ? '' : path;
+    document.getElementById('slock').value = isnew ? '' : isNaN(path) ? (path.includes('/') ? 'htaccess' : 'hosts') : 'firewall';
+    selectLock();
     document.getElementById('sattempts').value = isnew ? '' : attempts;
     document.getElementById('sduration').value = isnew ? '' : duration;
     document.getElementById('sthresh').value = isnew ? '' : threshold;
-    showHideWebPath();
     updateHint();
     ssave.disabled = false;
     sload.classList.replace('d-block', 'd-none');
@@ -123,15 +129,71 @@ function loadServiceSettings(id) {
         }
     });
 }
-function showHideWebPath() {
-    document.getElementById('web-path').className = document.getElementById('stype').value === 'ssh' ? 'mb-3 d-none' : 'mb-3';
-    document.getElementById('spath').required = document.getElementById('stype').value !== 'ssh';
+const VALUES_SERVICES = {
+    'joomla': 'Joomla',
+    'wordpress': 'WordPress',
+    'ssh': 'SSH',
+    'phpmyadmin': 'phpMyAdmin'
+}
+function selectService() {
+    let service = document.getElementById('stype').value, value = VALUES_SERVICES[service] ?? 'Service';
+    if (service === 'phpmyadmin' || service === 'wordpress')
+        document.getElementById('service-name').innerText = "Apache";
+    else
+        document.getElementById('service-name').innerText = value;
+    document.getElementById('service-name-2').innerText = value;
+    document.getElementById('service-name-3').innerText = value;
+    document.getElementById('external-service-settings').innerText = value + " installation settings";
+    document.getElementById('option-htaccess').disabled = service === 'ssh';
+}
+function selectLock() {
+    let value = document.getElementById('slock').value;
+    if (value === 'htaccess' || value === 'hosts') {
+        document.getElementById('lock-arg-name').innerText = value === 'htaccess' ? "Web folder path" : "Daemon name";
+        document.getElementById('spath').type = "text";
+        document.getElementById('spath').removeAttribute("min");
+        document.getElementById('spath').removeAttribute("max");
+        document.getElementById('spath').removeAttribute("step");
+    } else {
+        document.getElementById('lock-arg-name').innerText = "Port number";
+        document.getElementById('spath').type = "number";
+        document.getElementById('spath').min = 0;
+        document.getElementById('spath').max = 65535;
+        document.getElementById('spath').step = 1;
+    }
+    document.getElementById('service-name-3').innerText = VALUES_SERVICES[value];
+}
+function bestSettings() {
+    let service = document.getElementById('stype').value;
+    if (service === 'ssh') {
+        document.getElementById('slogs').value = '/var/log/auth.log';
+        document.getElementById('slock').value = 'hosts';
+        selectLock();
+        document.getElementById('spath').value = 'sshd';
+    } else if (service === 'joomla') {
+        document.getElementById('slogs').value = '/var/www/html/administrator/logs/error.php';
+        document.getElementById('slock').value = 'htaccess';
+        selectLock();
+        document.getElementById('spath').value = '/var/www/html/administrator';
+    } else if (service === 'wordpress') {
+        document.getElementById('slogs').value = '/var/log/apache2/access.log';
+        document.getElementById('slock').value = 'htaccess';
+        selectLock();
+        document.getElementById('spath').value = '/var/www/html/wp-admin';
+    } else if (service === 'phpmyadmin') {
+        document.getElementById('slogs').value = '/var/log/apache2/access.log';
+        document.getElementById('slock').value = 'htaccess';
+        selectLock();
+        document.getElementById('spath').value = '/placeholder/usr/share/phpmyadmin';
+    }
 }
 function updateHint() {
-    document.getElementById('hthresh').innerHTML = document.getElementById('sthresh').value ?? '_';
-    document.getElementById('hattempts').innerHTML = document.getElementById('sattempts').value ?? '_';
-    let duration = document.getElementById('sduration').value;
-    document.getElementById('hduration').innerHTML = duration ? 'for ' + duration + ' minutes' : 'permanently';
+    let value = document.getElementById('sthresh').value ?? 0;
+    document.getElementById('hthresh').innerHTML = value == 0 ? '_' : value;
+    value = document.getElementById('sattempts').value;
+    document.getElementById('hattempts').innerHTML = value == 0 ? '_' : value;
+    value = document.getElementById('sduration').value;
+    document.getElementById('hduration').innerHTML = value == 0 ? 'permanently' : 'for ' + value + ' minutes';
 }
 function saveServiceSettings(e, form) {
     e.preventDefault();
@@ -171,6 +233,7 @@ function confirmDeletion() {
         type: 'DELETE',
         success: function(data) {
             modalResult(null, "Deleted successfully!");
+            loadData(true);
         },
         error: function(err, _, __) {
             modalResult("Couldn't delete (" + err.status + " error)");
@@ -178,15 +241,36 @@ function confirmDeletion() {
         }
     })
 }
-function changePassword(e) {
-    e.preventDefault();
-    // TODO: send AJAX POST request
-    let ajax_error = "The auth system is not<br>implemented yet"; // Blank means no error
-    document.getElementById('pold').value = "";
-    document.getElementById('pnew').value = "";
-    document.getElementById('prepeat').value = "";
-    bootstrap.Modal.getOrCreateInstance(pmodal).hide();
-    modalResult(ajax_error);
+function changePassword(event, form) {
+    event.preventDefault();
+    $.ajax({
+        type: "POST",
+        data: $(form).serialize(),
+        url: "./API/password",
+        success: function(data) {
+            document.getElementById('pold').value = "";
+            document.getElementById('pnew').value = "";
+            document.getElementById('prepeat').value = "";
+            bootstrap.Modal.getOrCreateInstance(pmodal).hide();
+            modalResult(null, 'Password updated successfully!');
+        },
+        error: function(err, _, __) {
+            document.getElementById('pold').value = "";
+            document.getElementById('pnew').value = "";
+            document.getElementById('prepeat').value = "";
+            bootstrap.Modal.getOrCreateInstance(pmodal).hide();
+            let error = "Couldn't change password (" + err.status + " error)";
+            if (err.status === 400)
+                error = "New password should have at least 5 characters, and both fields must match";
+            else if (err.status === 401)
+                error = "The old password is not correct";
+            else if (err.status === 403) {
+                document.location.reload();
+                error = "EasIPS is obviously also protected against too many login attempts. Oops!"
+            }
+            modalResult(error);
+        }
+    });
 }
 function playPause(id) {
     $.ajax({

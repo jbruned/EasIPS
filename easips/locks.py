@@ -41,7 +41,10 @@ class FirewallLock(ServiceLock):
     """
 
     def __init__(self, port: Union[int, str], protocol: str = "tcp"):
-        self.port = port
+        # TODO: possibility to allow port ranges
+        assert port.isnumeric()
+        self.port = int(port)
+        assert 0 <= port <= 65535
         self.proto = protocol
 
     def block(self, ip_addr: Union[str, list]) -> bool:
@@ -71,6 +74,7 @@ class HTAccessLock(ServiceLock):
         if web_path[-1] != '/' and web_path[-1] != '\\':
             web_path += '/'
         self.path = web_path + '.htaccess'
+        open(self.path, 'w').close()  # Will throw an Exception if path is not valid or there's a lack of permissions
 
     def block(self, ip_addr: Union[str, list]) -> bool:
         if not isinstance(ip_addr, list):
@@ -153,7 +157,7 @@ class EtcHostsLock(ServiceLock):
     """
 
     def __init__(self, service_daemon_name: str, etc_hosts_deny_path: str = "/etc/hosts.deny"):
-        self.daemon = service_daemon_name
+        self.daemon = service_daemon_name  # TODO: check if the daemon exists
         self.path = etc_hosts_deny_path
 
     def block(self, ip_addr: Union[str, list]) -> bool:
