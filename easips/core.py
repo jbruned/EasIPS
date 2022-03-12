@@ -34,7 +34,10 @@ class ProtectedService:
         Gets the appropriate ServiceLock based on the service settings
         """
         if self.settings.web_path.isnumeric():
-            self.lock = FirewallLock(int(self.settings.web_path))
+            if self.settings.service == 'ssh':
+                self.lock = FirewallLock(22)
+            else:
+                self.lock = FirewallLock(80)
         elif '/' in self.settings.web_path:
             self.lock = HTAccessLock(self.settings.web_path)
         else:

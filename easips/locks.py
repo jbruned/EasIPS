@@ -55,7 +55,7 @@ class FirewallLock(ServiceLock):
         for single_ip in ip_addr:
             success &= modify_ufw_rule(f"ufw insert 1 deny from {single_ip} to any port {self.port} proto {self.proto}", True)
             try:
-                system_call(f"iptables -I DOCKER -s {single_ip} -p tcp --dport {self.port} -j DROP")  # in case docker is used (docker avoid ufw)
+                system_call(f"iptables -I DOCKER -s {single_ip} -p tcp --dport {self.port} -j DROP")  # in case docker is used (docker avoids ufw)
             except:
                 pass
         return success
@@ -67,7 +67,7 @@ class FirewallLock(ServiceLock):
         for single_ip in ip_addr:
             success &= modify_ufw_rule(f"ufw delete deny from {single_ip} to any port {self.port} proto {self.proto}")
             try:
-                system_call(f"iptables -D DOCKER -s {single_ip} -p tcp --dport {self.port} -j DROP")  # in case docker is used (docker avoid ufw)
+                system_call(f"iptables -D DOCKER -s {single_ip} -p tcp --dport {self.port} -j DROP")  # in case docker is used (docker avoids ufw)
             except:
                 pass
         return success
