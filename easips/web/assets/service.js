@@ -102,13 +102,34 @@ function addIp(e) {
     blockUnblock(document.getElementById('ip').value, true);
     document.getElementById('ip').value = "";
 }
-function changePassword(e) {
-    e.preventDefault();
-    // TODO: send AJAX POST request
-    let ajax_error = "The auth system is not<br>implemented yet"; // Blank means no error
-    document.getElementById('pold').value = "";
-    document.getElementById('pnew').value = "";
-    document.getElementById('prepeat').value = "";
-    bootstrap.Modal.getOrCreateInstance(pmodal).hide();
-    modalResult(ajax_error);
+function changePassword(event, form) {
+    event.preventDefault();
+    $.ajax({
+        type: "POST",
+        data: $(form).serialize(),
+        url: "../API/password",
+        success: function(data) {
+            document.getElementById('pold').value = "";
+            document.getElementById('pnew').value = "";
+            document.getElementById('prepeat').value = "";
+            bootstrap.Modal.getOrCreateInstance(pmodal).hide();
+            modalResult(null, 'Password updated successfully!');
+        },
+        error: function(err, _, __) {
+            document.getElementById('pold').value = "";
+            document.getElementById('pnew').value = "";
+            document.getElementById('prepeat').value = "";
+            bootstrap.Modal.getOrCreateInstance(pmodal).hide();
+            let error = "Couldn't change password (" + err.status + " error)";
+            if (err.status === 400)
+                error = "New password should have at least 5 characters, and both fields must match";
+            else if (err.status === 401)
+                error = "The old password is not correct";
+            else if (err.status === 403) {
+                document.location.reload();
+                error = "EasIPS is obviously also protected against too many login attempts. Oops!"
+            }
+            modalResult(error);
+        }
+    });
 }
