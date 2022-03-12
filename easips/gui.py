@@ -5,12 +5,14 @@ from flask import Flask, send_file, abort, request, redirect
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 
-from easips.core import ProtectedService, NotFoundException, BackgroundIPS
+from easips.core import ProtectedService, BackgroundIPS
 from easips.db import ServiceSettings, AppSettings
 from easips.util import InvalidSettingsException, NotFoundException
 
 
 class WebGUI:
+
+    _DEFAULT_ADMIN_PASSWORD = "admin"
 
     def __init__(self, ips_instance: BackgroundIPS, db: SQLAlchemy):
         self.ips_instance = ips_instance
@@ -33,10 +35,14 @@ class WebGUI:
         settings_query = AppSettings.query
         if not settings_query.all():
             db.session.add(AppSettings(
-                admin_password=get_hashed_password("admin")
-            ))  # default password is admin
+                admin_password=get_hashed_password(self._DEFAULT_ADMIN_PASSWORD)
+            ))  # load default app config on first run
             db.session.commit()
         self.settings = AppSettings.query.first()
+
+        if is_password_correct(self._DEFAULT_ADMIN_PASSWORD):
+            print(f"[Warning] Admin password is set to default: {self._DEFAULT_ADMIN_PASSWORD}\n"
+                  f"          Please change it from the GUI")
 
         @self.app.route('/')
         def dashboard():
@@ -53,13 +59,16 @@ class WebGUI:
 
         @self.app.route('/API/password', methods=['POST'])
         def change_password():
-            if not request.form['old'] or not not request.form['new'] or not request.form['repeat'] \
+            if not request.form['old'] or len(request.form['new'] or '') < 5 or len(request.form['repeat'] or '') < 5 \
                     or request.form['new'] != request.form['repeat']:
                 abort(400)
             if not is_password_correct(request.form['old']):
                 abort(401)
+            # TODO: abort(403) if login attempts have been exceeded
             self.settings.admin_password = get_hashed_password(request.form['new'])
+            db.session.merge(self.settings)
             db.session.commit()
+            return "", 200
 
         @self.app.route('/logout')
         def logout():
@@ -134,6 +143,8 @@ class WebGUI:
         def block_unblock(service_id):
             try:
                 s = self.ips_instance.get_service(int(service_id))
+                if not s.are_components_initialized():
+                    abort(418)
                 data = request.form
                 if data['block'] == 'false':
                     s.unblock(data['ip_address'], db)

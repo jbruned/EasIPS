@@ -67,7 +67,7 @@
 					<h5 class="modal-title" id="stitle">Service settings</h5>
 					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 				</div>
-				  <div class="modal-body">
+				<div class="modal-body">
 					<div class="text-center my-5 d-block" id="sload">
 						<div class="spinner-border" role="status">
 							<span class="visually-hidden">Loading...</span>
@@ -81,7 +81,7 @@
 							</div>
 							<div class="col-sm-6">
                                 <label for="stype" class="form-label mb-0">Type</label>
-                                <select class="form-select" id="stype" name="service" required onchange="showHideWebPath()">
+                                <select class="form-select" id="stype" name="service" required onchange="selectService()">
                                     <option disabled></option>
                                     <option value="ssh">SSH</option>
                                     <option value="joomla">Joomla</option>
@@ -90,16 +90,53 @@
                                 </select>
 							</div>
 						</div>
-						<div class="mb-3">
-							<label for="slogs" class="form-label mb-0">Log file location</label>
-							<input type="text" class="form-control" id="slogs" name="log_path">
-							<!--<div class="form-text mt-0">Leave empty to use the default path for the selected service</div>-->
-						</div>
-						<div class="mb-3 d-none" id="web-path">
-							<label for="spath" class="form-label mb-0">Web root path</label>
-							<input type="text" class="form-control" id="spath" name="web_path">
-							<!--<div class="form-text mt-0">Leave empty to use the default path for the selected service</div>-->
-						</div>
+                        <div class="accordion mb-3" id="lock-settings-accordion">
+                            <div class="accordion-item">
+                                <h5 class="accordion-header" id="lock-settings-title">
+                                    <button class="accordion-button" type="button" data-bs-toggle="collapse"
+                                            data-bs-target="#lock-settings" aria-expanded="false"
+                                            aria-controls="lock-settings" id="external-service-settings">
+                                        External service settings
+                                    </button>
+                                </h5>
+                                <div id="lock-settings" class="accordion-collapse collapse show"
+                                     aria-labelledby="lock-settings-title" data-bs-parent="#lock-settings-accordion">
+                                    <div class="accordion-body">
+                                        <div class="mb-3">
+                                            <label for="slogs" class="form-label mb-0"><span id="service-name">Service</span>'s log file location</label>
+                                            <input type="text" class="form-control" id="slogs" name="log_path">
+                                            <div class="form-text mt-0"><!--<i class="bi bi-info-circle-fill me-1 small"></i>-->If it's installed in a <i>container</i>, you can access it using a <i>volume</i></div>
+                                        </div>
+                                        <div class="row mb-3">
+                                            <div class="col-sm-6">
+                                                <label for="slock" class="form-label mb-0">
+                                                    Lock type
+                                                    <i class="bi bi-info-circle-fill" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="right"
+                                                       title="Port-wise firewall: block a port (only if the service is installed locally)<br><br>
+                                                              Daemon-wise firewall: block a service (only if you know the daemon name)<br><br>
+                                                              Path-wise web lock: block a path of your website (only if it's running on Apache)"></i>
+                                                </label>
+                                                <select class="form-select" name="lock" id="slock" required onchange="selectLock()">
+                                                    <option disabled selected></option>
+                                                    <option value="firewall">Port-wise firewall</option>
+                                                    <option value="hosts">Daemon-wise firewall</option>
+                                                    <option value="htaccess" id="option-htaccess">Path-wise web lock</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-sm-6">
+                                                <label for="spath" class="form-label mb-0" id="lock-arg-name">Web root path</label>
+                                                <input type="text" class="form-control" id="spath" name="web_path">
+                                                <!--<div class="form-text mt-0">Leave empty to use the default path for the selected service</div>-->
+                                            </div>
+                                        </div>
+                                        <div class="text-center">
+                                            <a class="btn btn-primary" href="javascript:bestSettings()">Just pick the best settings for me!</a>
+                                            <div class="form-text mt-0" style="font-size: smaller">Default values for <span id="service-name-2">your service</span> will be used</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 						<div class="row mb-3">
 							<div class="col-sm-6">
 								<label for="sattempts" class="form-label mb-0">Maximum failed attempts</label>
@@ -113,9 +150,12 @@
 						<div class="mb-3">
                             <label for="sduration" class="form-label mb-0">Block duration</label>
                             <input type="number" class="form-control" id="sduration" name="block_duration" onchange="updateHint()" onkeyup="updateHint()">
-                            <div class="form-text mt-0">Leave empty to block permanently</div>
+                            <div class="form-text mt-0"><!--<i class="bi bi-info-circle-fill me-1 small"></i>-->Leave empty for permanent blocks</div>
 						</div>
-						<div class="alert alert-primary text-center">If any IP exceeds <span id="hattempts">_</span> login attempts within <span id="hthresh">_</span> minutes, it will be blocked <span id="hduration">for _ minutes</span></div>
+						<div class="alert alert-primary text-center d-flex justify-content-between align-items-center">
+                            <div><i class="bi bi-info-circle-fill me-2 small"></i></div>
+                            <div>If any IP exceeds <span id="hattempts">_</span> login attempts within <span id="hthresh">_</span> minutes, it will be blocked from <span id="service-name-3">the service</span> <span id="hduration">for _ minutes</span></div>
+                        </div>
 					</div>
 				</div>
 				<div class="modal-footer">
@@ -127,7 +167,7 @@
 	</div>
 	<div class="modal fade" id="pmodal" tabindex="-1" aria-labelledby="ptitle" aria-hidden="true">
 		<div class="modal-dialog">
-			<form class="modal-content" action="./password" method="POST" onsubmit="return changePassword(event)">
+			<form class="modal-content" action="./API/password" method="POST" onsubmit="return changePassword(event, this)">
 				<div class="modal-header">
 					<h5 class="modal-title" id="ptitle">Change admin password</h5>
 					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
