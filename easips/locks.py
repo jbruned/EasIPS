@@ -38,7 +38,7 @@ class FirewallLock(ServiceLock):
         self.port = port
         assert 0 <= port <= 65535
         self.proto = protocol
-        assert subprocess.run(['sudo', 'ufw', 'enable'], capture_output=False).returncode == 0
+        assert system_call('sudo ufw enable')
 
     def block(self, ip_addr: Union[str, list]) -> bool:
         if not isinstance(ip_addr, list):

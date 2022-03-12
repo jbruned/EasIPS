@@ -1,7 +1,7 @@
 import json
 from logging import getLogger, CRITICAL
 
-from flask import Flask, send_file, abort, request, redirect
+from flask import Flask, send_file, abort, request, redirect, send_from_directory
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 
@@ -44,10 +44,15 @@ class WebGUI:
             print(f"[Warning] Admin password is set to default: {self._DEFAULT_ADMIN_PASSWORD}\n"
                   f"          Please change it from the GUI")
 
+        def logged_in():
+            return True  # TODO: check if the user is logged in
+
+        def ip_is_blocked(request):
+            return self.ips_instance.get_easips_service().is_blocked(request.remote_addr)
+
         @self.app.route('/')
         def dashboard():
-            logged_in = False  # TODO: check if logged in
-            if not logged_in:
+            if not logged_in():
                 send_file("web/login.html")
             return send_file("web/dashboard.html")
 
@@ -59,12 +64,13 @@ class WebGUI:
 
         @self.app.route('/API/password', methods=['POST'])
         def change_password():
+            if ip_is_blocked(request):
+                return send_file('web/blocked.html'), 403
             if not request.form['old'] or len(request.form['new'] or '') < 5 or len(request.form['repeat'] or '') < 5 \
                     or request.form['new'] != request.form['repeat']:
                 abort(400)
             if not is_password_correct(request.form['old']):
                 abort(401)
-            # TODO: abort(403) if login attempts have been exceeded
             self.settings.admin_password = get_hashed_password(request.form['new'])
             db.session.merge(self.settings)
             db.session.commit()
@@ -72,11 +78,13 @@ class WebGUI:
 
         @self.app.route('/logout')
         def logout():
-            # TODO: end user session
+            # TODO: end user session if exists
             return redirect("/")
 
         @self.app.route('/service/<service_id>')
         def service(service_id):
+            if ip_is_blocked(request):
+                abort(403)
             try:
                 self.ips_instance.get_service(int(service_id))
             except ValueError:
@@ -88,6 +96,8 @@ class WebGUI:
         @self.app.route('/API/services/', methods=['GET', 'POST'])
         @self.app.route('/API/services/<service_id>', methods=['GET', 'POST', 'DELETE'])
         def api_service(service_id=None):
+            if ip_is_blocked(request):
+                abort(403)
             try:
                 if service_id is not None:
                     service_id = int(service_id)
@@ -134,6 +144,8 @@ class WebGUI:
 
         @self.app.route('/API/services/<service_id>/playpause', methods=['POST'])
         def toggle_running(service_id):
+            if ip_is_blocked(request):
+                abort(403)
             try:
                 self.ips_instance.get_service(int(service_id)).toggle_stopped()
                 return str(service_id), 200
@@ -146,6 +158,8 @@ class WebGUI:
 
         @self.app.route('/API/services/<service_id>/blocked', methods=['POST'])
         def block_unblock(service_id):
+            if ip_is_blocked(request):
+                abort(403)
             try:
                 s = self.ips_instance.get_service(int(service_id))
                 if not s.are_components_initialized():
@@ -163,6 +177,8 @@ class WebGUI:
 
         @self.app.route('/API/services/<service_id>/blocked', methods=['GET'])
         def blocked_ips(service_id):
+            if ip_is_blocked(request):
+                abort(403)
             try:
                 return json.dumps(self.ips_instance.get_service(int(service_id)).get_blocked_ips(
                     historic=True), default=str)
@@ -174,6 +190,8 @@ class WebGUI:
         @self.app.route('/assets/<filename>')
         def asset(filename):
             try:
+                while '../' in filename:
+                    filename = filename.replace('../', '')
                 return send_file(f"web/assets/{filename}")
             except FileNotFoundError:
                 abort(404)

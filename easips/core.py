@@ -9,6 +9,7 @@ from sqlalchemy import desc
 
 from easips.db import ServiceSettings, LoginAttempt, BlockedIP
 from easips.locks import ServiceLock, HTAccessLock, FirewallLock, EtcHostsLock
+from easips.log import debug
 from easips.login_trackers import LoginTracker, LogSniffer
 from easips.util import ip_addr_is_valid, datetime_difference, InvalidSettingsException, NotFoundException
 
@@ -35,9 +36,9 @@ class ProtectedService:
         """
         if self.settings.service == 'easips':
             self.lock = None
-        elif self.settings.path.isnumeric():
+        elif self.settings.lock_resource.isnumeric():
             self.lock = FirewallLock(int(self.settings.lock_resource))
-        elif '/' in self.settings.path:
+        elif '/' in self.settings.lock_resource:
             self.lock = HTAccessLock(self.settings.lock_resource,
                                      f"easips/web/blocked_{'temp' if self.settings.block_duration else 'perm'}.html")
         else:
@@ -79,7 +80,8 @@ class ProtectedService:
         try:
             self._get_tracker()
             self._get_lock()
-        except:
+        except Exception as e:
+            debug(e)
             self.login_tracker = None
             self.lock = None
             if not self.settings.stopped:
@@ -361,6 +363,12 @@ class BackgroundIPS:
     def get_service(self, service_id: int) -> ProtectedService:
         for s in self.services:
             if int(s.settings.id) == int(service_id):
+                return s
+        raise NotFoundException
+
+    def get_easips_service(self) -> ProtectedService:
+        for s in self.services:
+            if s.settings.service == 'easips':
                 return s
         raise NotFoundException
 
