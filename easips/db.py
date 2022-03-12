@@ -18,7 +18,7 @@ class ServiceSettings(db.Model):
     max_attempts = db.Column(db.Integer, nullable=False)  # exceeded within [time_threshold]
     block_duration = db.Column(db.Integer, nullable=True)  # null means infinite
     log_path = db.Column(db.String(150), nullable=True)
-    web_path = db.Column(db.String(150), nullable=True)
+    lock_resource = db.Column(db.String(150), nullable=True)  # If numeric: port, if contains /: web path, else: daemon
     stopped = db.Column(db.Boolean, nullable=False)
 
 
