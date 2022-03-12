@@ -8,7 +8,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import desc
 
 from easips.db import ServiceSettings, LoginAttempt, BlockedIP
-from easips.locks import ServiceLock, HTAccessLock, FirewallLock
+from easips.locks import ServiceLock, HTAccessLock, FirewallLock, EtcHostsLock
 from easips.login_trackers import LoginTracker, LogSniffer
 from easips.util import ip_addr_is_valid, datetime_difference, InvalidSettingsException, NotFoundException
 
@@ -29,13 +29,50 @@ class ProtectedService:
         self.lock = None
         self.modified = False
 
+    def _get_lock(self):
+        """
+        Gets the appropriate ServiceLock based on the service settings
+        """
+        if self.settings.path.isNumeric():
+            self.lock = FirewallLock(int(self.settings.path))
+        elif '/' in self.settings.path:
+            self.lock = HTAccessLock(self.settings.path)
+        else:
+            self.lock = EtcHostsLock(self.settings.path)
+
+    _REGEX_LIST = {  # service_name: list_of_regex
+        'joomla': [
+            # Detect joomla in error log
+            r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}\tINFO\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\tjoomlafailure\t.*Username.*password.*not.*match.*'
+        ],
+        'wordpress': [
+            # Detect specific apache log lines
+            r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*POST\s/wp-login\.php.*\s200\s\d+.*'
+        ],
+        'ssh': [
+            # Detect in log from rsyslog
+            r'^\w{3}\s*\d{1,2}\s\d{2}:\d{2}:\d{2}\ssshserver.*repeated\s(\d+)\stimes.*Fail.*password.*\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*',
+            r'^\w{3}\s*\d{1,2}\s\d{2}:\d{2}:\d{2}\ssshserver.*Fail.*password.*\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*',
+        ],
+        'phpmyadmin': [
+            # Detect specific apache log lines
+            r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*POST\s/index\.php.*\s200\s\d+.*'
+        ]
+    }
+
+    def _get_tracker(self):
+        """
+        Gets the appropriate LoginTracker based on the service settings
+        """
+        self.login_tracker = LogSniffer(self.settings.log_path, self._REGEX_LIST[self.settings.type])
+
     def init_components(self):
         """
         Initializes both the LoginTracker and the Lock or raises an InvalidSettingsException
         """
         try:
-            self.login_tracker = LogSniffer(self.settings.log_path, self._SERVICES[self.settings.service][0])
-            self.lock = FirewallLock(22)  # TODO: instantiate depending on settings or throw InvalidSettingsException
+            self._get_tracker()
+            self._get_lock()
         except:
             self.login_tracker = None
             self.lock = None
@@ -272,36 +309,6 @@ class ProtectedService:
         ServiceSettings.query.filter(ServiceSettings.id == self.settings.id).delete()
         db.session.commit()
         self.settings = None
-
-    # service_name: (list_of_regex, lock_class)
-    _SERVICES = {
-        'joomla': (
-            [
-                # Detect joomla in error log
-                r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}\tINFO\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\tjoomlafailure\t.*Username.*password.*not.*match.*'
-            ],
-            HTAccessLock),
-        'wordpress': (
-            [
-                # Detect specific apache log lines
-                r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*POST\s/wp-login\.php.*\s200\s\d+.*'
-            ],
-            HTAccessLock),
-        'ssh': [
-            [
-                # Detect in log from rsyslog
-                r'^\w{3}\s*\d{1,2}\s\d{2}:\d{2}:\d{2}\ssshserver.*repeated\s(\d+)\stimes.*Fail.*password.*\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*',
-                r'^\w{3}\s*\d{1,2}\s\d{2}:\d{2}:\d{2}\ssshserver.*Fail.*password.*\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*',
-            ],
-            FirewallLock],
-        'phpmyadmin': [
-            [
-                # Detect specific apache log lines
-                r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*POST\s/index\.php.*\s200\s\d+.*'
-            ]
-            , HTAccessLock],
-        # ...
-    }
 
     @staticmethod
     def is_service_valid(service_name: str, log_path: str = None, web_path: str = None):
