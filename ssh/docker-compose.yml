@@ -12,13 +12,5 @@ services:
       - ALL
     volumes:
       - ./logs:/var/log/
-    networks:
-      home_net:
-        ipv4_address: 192.168.124.10
-
-networks:
-  home_net:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 192.168.124.0/24
+    ports:
+      - '22:22'

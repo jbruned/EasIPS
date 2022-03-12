@@ -40,7 +40,7 @@ class ProtectedService:
         elif '/' in self.settings.path:
             self.lock = HTAccessLock(self.settings.path)
         else:
-            self.lock = EtcHostsLock(self.settings.path)
+            self.lock = EtcHostsLock(self.settings.web_path)
 
     _REGEX_LIST = {  # service_name: list_of_regex
         'joomla': [
@@ -78,7 +78,7 @@ class ProtectedService:
         try:
             self._get_tracker()
             self._get_lock()
-        except:
+        except Exception as e:
             self.login_tracker = None
             self.lock = None
             if not self.settings.stopped:
