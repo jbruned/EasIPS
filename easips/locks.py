@@ -1,8 +1,15 @@
-import subprocess as sub
 from abc import ABC, abstractmethod
 from typing import Union
+
 from easips.util import system_call
-from shutil import copyfile
+
+BLOCKED_HTML = "<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1, shrink-to-fit=no'>" \
+               "<title>Forbidden | EasIPS</title><link href='./assets/bootstrap.min.css' rel='stylesheet'>" \
+               "<link href='./assets/bootstrap-icons.css' rel='stylesheet'></head><body class='bg-light'>" \
+               "<main style='height: 100%'>" \
+               "<div class='text-center pb-5' style='width: 100%; position: absolute; top: 50%; -ms-transform: translateY(-50%); transform: translateY(-50%);'>" \
+               "<h1 class='d-inline'><i class='bi bi-lock-fill me-2'></i>Oops...</h1><p class='lead'>Too many login attempts!</p>" \
+               "<p>You have been temporarily locked out of the system</p></div></main></body></html>"
 
 
 class ServiceLock(ABC):
@@ -97,7 +104,7 @@ class HTAccessLock(ServiceLock):
                         else:
                             rest_of_file += line
                     if "ErrorDocument 403 " in line:
-                        new_contents += "ErrorDocument 403 blocked.html\n"
+                        new_contents += line
                         error_doc_found = True
                 f.close()
             except FileNotFoundError:
@@ -106,14 +113,15 @@ class HTAccessLock(ServiceLock):
                 if not found:
                     new_contents += f"Deny from {single_ip}\n"
             if not error_doc_found:
-                new_contents += "ErrorDocument 403 blocked.html\n"
-            copyfile(self.path.replace('.htaccess', 'blocked.html'), "web/blocked.html")
+                new_contents += "ErrorDocument 403 \"" + BLOCKED_HTML + "\"\n"
+                # todo blocked_permanent
             new_contents += rest_of_file
             f = open(self.path, "w")
             f.write(new_contents)
             f.close()
             return True
-        except:
+        except Exception as e:
+            print(e)
             return False
 
     def unblock(self, ip_addr: Union[str, list]) -> bool:
