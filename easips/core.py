@@ -33,12 +33,12 @@ class ProtectedService:
         """
         Gets the appropriate ServiceLock based on the service settings
         """
-        if self.settings.path.isNumeric():
-            self.lock = FirewallLock(int(self.settings.path))
-        elif '/' in self.settings.path:
-            self.lock = HTAccessLock(self.settings.path)
+        if self.settings.web_path.isnumeric():
+            self.lock = FirewallLock(int(self.settings.web_path))
+        elif '/' in self.settings.web_path:
+            self.lock = HTAccessLock(self.settings.web_path)
         else:
-            self.lock = EtcHostsLock(self.settings.path)
+            self.lock = EtcHostsLock(self.settings.web_path)
 
     _REGEX_LIST = {  # service_name: list_of_regex
         'joomla': [
@@ -64,7 +64,7 @@ class ProtectedService:
         """
         Gets the appropriate LoginTracker based on the service settings
         """
-        self.login_tracker = LogSniffer(self.settings.log_path, self._REGEX_LIST[self.settings.type])
+        self.login_tracker = LogSniffer(self.settings.log_path, self._REGEX_LIST[self.settings.service])
 
     def init_components(self):
         """
@@ -73,7 +73,7 @@ class ProtectedService:
         try:
             self._get_tracker()
             self._get_lock()
-        except:
+        except Exception as e:
             self.login_tracker = None
             self.lock = None
             if not self.settings.stopped:
