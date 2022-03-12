@@ -134,6 +134,8 @@ class WebGUI:
         def block_unblock(service_id):
             try:
                 s = self.ips_instance.get_service(int(service_id))
+                if not s.are_components_initialized():
+                    abort(418)
                 data = request.form
                 if data['block'] == 'false':
                     s.unblock(data['ip_address'], db)

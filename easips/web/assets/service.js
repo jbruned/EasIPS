@@ -8,6 +8,7 @@ const success_modal = bootstrap.Modal.getOrCreateInstance(document.getElementByI
 function modalResult(error_message = null, success_message = null) {
     success_modal.show();
     success_title.innerHTML = error_message || success_message || 'Saved successfully!';
+    success_title.className = success_title.innerText.length > 55 ? 'h5' : 'h3';
     if (error_message) {
         success_icon.classList.remove('bi-check2-circle');
         success_icon.classList.remove('text-danger');
@@ -42,7 +43,10 @@ function blockUnblock(addr, block=false) {
             modalResult(error_message=null, success_message="IP address " + (block ? '' : 'un') + "blocked<br>successfully");
         },
         error: function(err, _, _) {
-            modalResult(error_message = "Couldn't " + (block ? '' : 'un') + "block IP<br>(" + err.status + " error)");
+            let error = "Couldn't " + (block ? '' : 'un') + "block IP<br>(" + err.status + " error)";
+            if (err.status == 418)
+                error = "Couldn't " + (block ? '' : 'un') + "block IP because the service is stopped";
+            modalResult(error);
             loadData(true);
         }
     });
@@ -73,7 +77,10 @@ function loadData (manual=false) {
                 countdown.innerHTML = Math.max(left4refresh, 0) + "";
             },
             error: function(err, _, _) {
-                modalResult(error_message = "Couldn't load the list of<br>blocked IPs (" + err.status + ' error)<br><br><a class="btn btn-primary" href="javascript:window.location.reload(true);">Reload</a>');
+                let error = "Couldn't load the blocked<br>IPs list (" + err.status + ' error)';
+                if (err.status == 0)
+                    error = "Couldn't connect to the server, is it running?";
+                modalResult(error + '<br><br><a class="btn btn-primary" href="javascript:window.location.reload(true);">Reload</a>');
                 left4refresh = REFRESH_INTERVAL;
                 countdown.innerHTML = Math.max(left4refresh, 0) + "";
             }
