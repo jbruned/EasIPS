@@ -40,7 +40,7 @@ class WebGUI:
         self.settings = AppSettings.query.first()
 
         if is_password_correct(self._DEFAULT_ADMIN_PASSWORD):
-            print(f"[Warning] Admin password is set to default: f{self._DEFAULT_ADMIN_PASSWORD}\n"
+            print(f"[Warning] Admin password is set to default: {self._DEFAULT_ADMIN_PASSWORD}\n"
                   f"          Please change it from the GUI")
 
         @self.app.route('/')
