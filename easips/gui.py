@@ -5,12 +5,13 @@ from flask import Flask, send_file, abort, request, redirect
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 
-from easips.core import ProtectedService, NotFoundException, BackgroundIPS
+from easips.core import ProtectedService, BackgroundIPS
 from easips.db import ServiceSettings, AppSettings
 from easips.util import InvalidSettingsException, NotFoundException
 
 
 class WebGUI:
+
     _DEFAULT_ADMIN_PASSWORD = "admin"
 
     def __init__(self, ips_instance: BackgroundIPS, db: SQLAlchemy):
@@ -35,7 +36,7 @@ class WebGUI:
         if not settings_query.all():
             db.session.add(AppSettings(
                 admin_password=get_hashed_password(self._DEFAULT_ADMIN_PASSWORD)
-            ))  # default password is admin
+            ))  # load default app config on first run
             db.session.commit()
         self.settings = AppSettings.query.first()
 
