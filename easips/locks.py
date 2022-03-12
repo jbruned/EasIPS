@@ -4,14 +4,6 @@ from typing import Union
 
 from easips.util import modify_ufw_rule, system_call
 
-BLOCKED_HTML = "<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1, shrink-to-fit=no'>" \
-               "<title>Forbidden | EasIPS</title><link href='./assets/bootstrap.min.css' rel='stylesheet'>" \
-               "<link href='./assets/bootstrap-icons.css' rel='stylesheet'></head><body class='bg-light'>" \
-               "<main style='height: 100%'>" \
-               "<div class='text-center pb-5' style='width: 100%; position: absolute; top: 50%; -ms-transform: translateY(-50%); transform: translateY(-50%);'>" \
-               "<h1 class='d-inline'><i class='bi bi-lock-fill me-2'></i>Oops...</h1><p class='lead'>Too many login attempts!</p>" \
-               "<p>You have been temporarily locked out of the system</p></div></main></body></html>"
-
 
 class ServiceLock(ABC):
     """
@@ -53,9 +45,10 @@ class FirewallLock(ServiceLock):
             ip_addr = [ip_addr]
         success = True
         for single_ip in ip_addr:
-            success &= modify_ufw_rule(f"ufw insert 1 deny from {single_ip} to any port {self.port} proto {self.proto}", True)
+            success &= modify_ufw_rule(f"ufw insert 1 deny from {single_ip} to any port {self.port} proto {self.proto}")
             try:
-                system_call(f"iptables -I DOCKER -s {single_ip} -p tcp --dport {self.port} -j DROP")  # in case docker is used (docker avoids ufw)
+                # In case docker is used (docker avoids ufw)
+                system_call(f"iptables -I DOCKER -s {single_ip} -p tcp --dport {self.port} -j DROP")
             except:
                 pass
         return success
@@ -67,7 +60,8 @@ class FirewallLock(ServiceLock):
         for single_ip in ip_addr:
             success &= modify_ufw_rule(f"ufw delete deny from {single_ip} to any port {self.port} proto {self.proto}")
             try:
-                system_call(f"iptables -D DOCKER -s {single_ip} -p tcp --dport {self.port} -j DROP")  # in case docker is used (docker avoids ufw)
+                # In case docker is used (docker avoids ufw)
+                system_call(f"iptables -D DOCKER -s {single_ip} -p tcp --dport {self.port} -j DROP")
             except:
                 pass
         return success
@@ -79,10 +73,13 @@ class HTAccessLock(ServiceLock):
     This method is based on modifying the .htaccess file on the desired path
     """
 
-    def __init__(self, web_path: str):
+    def __init__(self, web_path: str, blocked_html_file: str):
         if web_path[-1] != '/' and web_path[-1] != '\\':
             web_path += '/'
         self.path = web_path + '.htaccess'
+        f = open(blocked_html_file, "r")
+        self.blocked_html = f.read().replace('\n', '').replace('\r', '').replace('"', '\'')
+        f.close()
         open(self.path, 'w').close()  # Will throw an Exception if path is not valid or there's a lack of permissions
 
     def block(self, ip_addr: Union[str, list]) -> bool:
@@ -126,15 +123,13 @@ class HTAccessLock(ServiceLock):
                 if not found:
                     new_contents += f"Deny from {single_ip}\n"
             if not error_doc_found:
-                new_contents += "ErrorDocument 403 \"" + BLOCKED_HTML + "\"\n"
-                # todo blocked_permanent
+                new_contents += 'ErrorDocument 403 "' + self.blocked_html + '"\n'
             new_contents += rest_of_file
             f = open(self.path, "w")
             f.write(new_contents)
             f.close()
             return True
-        except Exception as e:
-            print(e)
+        except:
             return False
 
     def unblock(self, ip_addr: Union[str, list]) -> bool:
