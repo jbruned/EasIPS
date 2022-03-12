@@ -315,7 +315,7 @@ class ProtectedService:
         """
         Checks if the desired service is supported
         """
-        return service_name in ProtectedService._SERVICES.keys()  # TODO: proper validation
+        return service_name in ProtectedService._REGEX_LIST.keys()  # TODO: proper validation
 
 
 class BackgroundIPS:
