@@ -6,6 +6,7 @@ from waitress import serve
 from easips.core import BackgroundIPS
 from easips.db import db
 from easips.gui import WebGUI
+from easips.log import log_info
 
 
 class EasIPS:
@@ -21,7 +22,7 @@ class EasIPS:
             web_thread = Thread(target=lambda: serve(self.gui.app, listen=web_addr_port))
             web_thread.daemon = True
             web_thread.start()
-            print(f"[Info] Started web interface at http://{web_addr_port}")
+            log_info(f"Started web interface at http://{web_addr_port}")
             self.ips.run()
         except KeyboardInterrupt:
             print("\nTerminating EasIPS...")
