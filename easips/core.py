@@ -33,13 +33,12 @@ class ProtectedService:
         """
         Gets the appropriate ServiceLock based on the service settings
         """
-        if self.settings.web_path.isnumeric():
-            if self.settings.service == 'ssh':
-                self.lock = FirewallLock(22)
-            else:
-                self.lock = FirewallLock(80)
-        elif '/' in self.settings.web_path:
-            self.lock = HTAccessLock(self.settings.web_path)
+        if self.settings.service == 'easips':
+            self.lock = None
+        elif self.settings.path.isNumeric():
+            self.lock = FirewallLock(int(self.settings.path))
+        elif '/' in self.settings.path:
+            self.lock = HTAccessLock(self.settings.path)
         else:
             self.lock = EtcHostsLock(self.settings.web_path)
 
@@ -60,6 +59,9 @@ class ProtectedService:
         'phpmyadmin': [
             # Detect specific apache log lines
             r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*POST\s/index\.php.*\s200\s\d+.*'
+        ],
+        'easips': [
+            r'regex'  # TODO: EasIPS regular expression
         ]
     }
 
@@ -81,7 +83,6 @@ class ProtectedService:
             self.lock = None
             if not self.settings.stopped:
                 self.toggle_stopped(True)
-            print(e)
             print(f"[Error] Couldn't initialize service '{self.settings.name}', thus it has been stopped", file=stderr)
             raise InvalidSettingsException
 
@@ -89,7 +90,7 @@ class ProtectedService:
         """
         Returns True if the LoginTracker and the Lock are initialized
         """
-        return self.login_tracker is not None and self.lock is not None
+        return self.login_tracker is not None  # and self.lock is not None
 
     def iteration(self, db: SQLAlchemy):
         """
@@ -189,7 +190,7 @@ class ProtectedService:
                 # db.session.add(obj)
                 db.session.commit()
                 print(f"[Info] {ip_addr} was already blocked from '{self.settings.name}', time is now updated")
-            elif self.lock.block(ip_addr):
+            elif self.settings.service == 'easips' or self.lock.block(ip_addr):
                 db.session.add(BlockedIP(
                     service_id=self.settings.id,
                     ip_addr=ip_addr,
@@ -215,7 +216,7 @@ class ProtectedService:
                 warn(f"[Warning] {ip_addr} is not a valid IP address to unblock")
             elif not self.is_blocked(ip_addr):
                 print(f"[Info] Attempted to unblock not blocked address {ip_addr} from service '{self.settings.name}'")
-            elif self.lock.unblock(ip_addr):
+            elif self.settings.service == 'easips' or self.lock.unblock(ip_addr):
                 query = BlockedIP.query.filter(BlockedIP.service_id == self.settings.id, BlockedIP.ip_addr == ip_addr,
                                                BlockedIP.active)
                 for obj in query.all():
@@ -300,7 +301,7 @@ class ProtectedService:
             'max_attempts': self.settings.max_attempts,
             'block_duration': self.settings.block_duration,
             'log_path': self.settings.log_path,
-            'web_path': self.settings.web_path,
+            'lock_resource': self.settings.lock_resource,
             'stopped': self.settings.stopped,
             'blocked_now': len(self.get_blocked_ips()),
             'blocked_24h': len(self.get_blocked_ips(last_24h=True)),
@@ -315,11 +316,11 @@ class ProtectedService:
         self.settings = None
 
     @staticmethod
-    def is_service_valid(service_name: str, log_path: str = None, web_path: str = None):
+    def is_service_name_valid(service_name: str):
         """
         Checks if the desired service is supported
         """
-        return service_name in ProtectedService._REGEX_LIST.keys()  # TODO: proper validation
+        return service_name == 'easips' or service_name in ProtectedService._REGEX_LIST.keys()
 
 
 class BackgroundIPS:
@@ -334,16 +335,27 @@ class BackgroundIPS:
         self.db = db
 
     def load_db(self):
-        for s in ServiceSettings.query.all():
-            self.add_service(s)
+        try:
+            for s in ServiceSettings.query.all():
+                self.add_service(s)
+            if len(self.services) == 0:
+                self.add_service(ServiceSettings(
+                    name="EasIPS admin panel",
+                    service="easips",
+                    time_threshold=5,
+                    max_attempts=5,
+                    block_duration=5,
+                    log_path="easips.log",
+                    lock_resource=None,
+                    stopped=False
+                ))
+        except InvalidSettingsException:
+            pass
 
     def add_service(self, settings: ServiceSettings):
         service = ProtectedService(settings)
         self.services.append(service)
-        try:
-            service.flag_as_modified()
-        except InvalidSettingsException:
-            pass
+        service.flag_as_modified()
 
     def get_service(self, service_id: int) -> ProtectedService:
         for s in self.services:

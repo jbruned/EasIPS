@@ -81,6 +81,9 @@
 							</div>
 							<div class="col-sm-6">
                                 <label for="stype" class="form-label mb-0">Type</label>
+                                <select class="form-select" id="stype-easips" disabled>
+                                    <option>EasIPS</option>
+                                </select>
                                 <select class="form-select" id="stype" name="service" required onchange="selectService()">
                                     <option disabled></option>
                                     <option value="ssh">SSH</option>
@@ -107,7 +110,7 @@
                                             <input type="text" class="form-control" id="slogs" name="log_path">
                                             <div class="form-text mt-0"><!--<i class="bi bi-info-circle-fill me-1 small"></i>-->If it's installed in a <i>container</i>, you can access it using a <i>volume</i></div>
                                         </div>
-                                        <div class="row mb-3">
+                                        <div class="row mb-3" id="lock-row">
                                             <div class="col-sm-6">
                                                 <label for="slock" class="form-label mb-0">
                                                     Lock type
@@ -125,13 +128,13 @@
                                             </div>
                                             <div class="col-sm-6">
                                                 <label for="spath" class="form-label mb-0" id="lock-arg-name">Web root path</label>
-                                                <input type="text" class="form-control" id="spath" name="web_path">
-                                                <!--<div class="form-text mt-0">Leave empty to use the default path for the selected service</div>-->
+                                                <input type="text" class="form-control" id="spath" name="lock_resource">
+                                                <div class="d-none text-danger small mt-0" id="err-path">Path must contain '/'</div>
                                             </div>
                                         </div>
                                         <div class="text-center">
                                             <a class="btn btn-primary" href="javascript:bestSettings()">Just pick the best settings for me!</a>
-                                            <div class="form-text mt-0" style="font-size: smaller">Default values for <span id="service-name-2">your service</span> will be used</div>
+                                            <div class="form-text mt-0" style="font-size: smaller" id="service-name-2">First select a service from the list</div>
                                         </div>
                                     </div>
                                 </div>
@@ -140,16 +143,16 @@
 						<div class="row mb-3">
 							<div class="col-sm-6">
 								<label for="sattempts" class="form-label mb-0">Maximum failed attempts</label>
-								<input type="number" class="form-control" id="sattempts" name="max_attempts" onchange="updateHint()" onkeyup="updateHint()" required>
+								<input type="number" class="form-control" id="sattempts" name="max_attempts" min="1" step="1" onchange="updateHint()" onkeyup="updateHint()" required>
 							</div>
 							<div class="col-sm-6">
                                 <label for="sthresh" class="form-label mb-0">Within threshold (mins)</label>
-                                <input type="number" class="form-control" id="sthresh" name="time_threshold" onchange="updateHint()" onkeyup="updateHint()" required>
+                                <input type="number" class="form-control" id="sthresh" name="time_threshold" min="1" onchange="updateHint()" onkeyup="updateHint()" required>
 							</div>
 						</div>
 						<div class="mb-3">
                             <label for="sduration" class="form-label mb-0">Block duration</label>
-                            <input type="number" class="form-control" id="sduration" name="block_duration" onchange="updateHint()" onkeyup="updateHint()">
+                            <input type="number" class="form-control" id="sduration" name="block_duration" min="1" onchange="updateHint()" onkeyup="updateHint()">
                             <div class="form-text mt-0"><!--<i class="bi bi-info-circle-fill me-1 small"></i>-->Leave empty for permanent blocks</div>
 						</div>
 						<div class="alert alert-primary text-center d-flex justify-content-between align-items-center">
@@ -175,15 +178,15 @@
 				<div class="modal-body">
 					<div class="mb-3">
 						<label for="pold" class="form-label">Old password</label>
-						<input type="password" class="form-control" id="pold" name="old" required>
+						<input type="password" class="form-control" id="pold" name="old" minlength="5" required>
 					</div>
 					<div class="mb-3">
 						<label for="pnew" class="form-label">New password</label>
-						<input type="password" class="form-control" id="pnew" name="new" required>
+						<input type="password" class="form-control" id="pnew" name="new" minlength="5" required>
 					</div>
 					<div class="mb-3">
 						<label for="prepeat" class="form-label">Repeat password</label>
-						<input type="password" class="form-control" id="prepeat" name="repeat" required>
+						<input type="password" class="form-control" id="prepeat" name="repeat" minlength="5" required>
 					</div>
 				</div>
 				<div class="modal-footer">

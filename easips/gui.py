@@ -96,10 +96,13 @@ class WebGUI:
                                       if service_id else self.ips_instance.get_services_info(), default=str)
                 elif request.method == 'POST':
                     data = request.form
-                    service_type = data['service'].lower()
-                    if not (service_type and data['max_attempts'] and
-                            ProtectedService.is_service_valid(service_type, data['log_path'] or None,
-                                                              data['web_path'] or None)):
+                    service_type = (data['service'] if 'service' in data else '').lower()
+                    if service_id is not None and (service_type is None or service_type == '') \
+                            and self.ips_instance.get_service(service_id).settings.service == 'easips':
+                        service_type = 'easips'
+                    if not (service_type and int(data['max_attempts']) > 0 and int(data['time_threshold']) > 0
+                            and data['log_path'] and (data['lock_resource'] or service_type == 'easips')
+                            and ProtectedService.is_service_name_valid(service_type)):
                         abort(400)
                     s = self.ips_instance.get_service(service_id).settings if service_id else ServiceSettings()
                     s.name = data['name'] or service_type + " server"
@@ -108,8 +111,8 @@ class WebGUI:
                     s.max_attempts = data['max_attempts']
                     s.block_duration = data['block_duration'] or None
                     s.log_path = data['log_path'] or None
-                    s.web_path = data['web_path'] or None
-                    if not service_id:
+                    s.lock_resource = data['lock_resource'] or None
+                    if service_id is None:
                         s.stopped = False
                     try:
                         if service_id:
@@ -120,6 +123,8 @@ class WebGUI:
                         abort(418)
                     return str(s.id), 200
                 elif request.method == 'DELETE':
+                    if self.ips_instance.get_service(service_id).settings.service == 'easips':
+                        abort(401)
                     self.ips_instance.del_service(service_id)
                     return str(service_id), 200
             except ValueError:

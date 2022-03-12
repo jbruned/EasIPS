@@ -95,10 +95,22 @@ let editingService = null;
 function fillServiceSettings(id = null, name = null, type = null, logs = null, path = null,
                                 attempts = null, duration = null, threshold = null) {
     editingService = id;
-    let isnew = id == null;
+    let isnew = id == null, is_easips = type === 'easips';
     document.getElementById('sname').value = isnew ? '' : name;
+    document.getElementById('stype').required = !is_easips;
+    if (is_easips) {
+        document.getElementById('stype').classList.add('d-none');
+        document.getElementById('lock-row').classList.add('d-none');
+        document.getElementById('stype-easips').classList.remove('d-none');
+    } else {
+        document.getElementById('stype').classList.remove('d-none');
+        document.getElementById('lock-row').classList.remove('d-none');
+        document.getElementById('stype-easips').classList.add('d-none');
+    }
     document.getElementById('stype').value = isnew ? '' : type;
     selectService();
+    document.getElementById('spath').required = !is_easips;
+    document.getElementById('slock').required = !is_easips;
     document.getElementById('slogs').value = isnew ? '' : logs;
     document.getElementById('spath').value = isnew ? '' : path;
     document.getElementById('slock').value = isnew ? '' : isNaN(path) ? (path.includes('/') ? 'htaccess' : 'hosts') : 'firewall';
@@ -108,6 +120,7 @@ function fillServiceSettings(id = null, name = null, type = null, logs = null, p
     document.getElementById('sthresh').value = isnew ? '' : threshold;
     updateHint();
     ssave.disabled = false;
+    document.getElementById('err-path').classList.add('d-none')
     sload.classList.replace('d-block', 'd-none');
     sform.classList.replace('d-none', 'd-block');
 }
@@ -119,9 +132,8 @@ function loadServiceSettings(id) {
         dataType: "json",
         url: "./API/services/" + id,
         success: function(data) {
-            fillServiceSettings(data['id'], data['name'], data['service'], data['log_path'],
-                                data['web_path'], data['max_attempts'], data['block_duration'],
-                                data['time_threshold']);
+            fillServiceSettings(data['id'], data['name'], data['service'], data['log_path'], data['lock_resource'],
+                                data['max_attempts'], data['block_duration'], data['time_threshold']);
         },
         error: function(err, _, __) {
             bootstrap.Modal.getOrCreateInstance(smodal).hide();
@@ -130,6 +142,8 @@ function loadServiceSettings(id) {
     });
 }
 const VALUES_SERVICES = {
+    '': 'Service',
+    'easips': 'EasIPS',
     'joomla': 'Joomla',
     'wordpress': 'WordPress',
     'ssh': 'SSH',
@@ -137,16 +151,20 @@ const VALUES_SERVICES = {
 }
 function selectService() {
     let service = document.getElementById('stype').value, value = VALUES_SERVICES[service] ?? 'Service';
+    if (document.getElementById('stype').classList.contains('d-none'))
+        value = VALUES_SERVICES['easips'];
     if (service === 'phpmyadmin' || service === 'wordpress')
         document.getElementById('service-name').innerText = "Apache";
     else
         document.getElementById('service-name').innerText = value;
-    document.getElementById('service-name-2').innerText = value;
+    document.getElementById('service-name-2').innerText = value === 'Service' ? "First choose a service from the list" : "Default values for " + value + " will be used";
     document.getElementById('service-name-3').innerText = value;
     document.getElementById('external-service-settings').innerText = value + " installation settings";
     document.getElementById('option-htaccess').disabled = service === 'ssh';
 }
 function selectLock() {
+    if (document.getElementById('stype').classList.contains('d-none'))
+        return;
     let value = document.getElementById('slock').value;
     if (value === 'htaccess' || value === 'hosts') {
         document.getElementById('lock-arg-name').innerText = value === 'htaccess' ? "Web folder path" : "Daemon name";
@@ -161,9 +179,11 @@ function selectLock() {
         document.getElementById('spath').max = 65535;
         document.getElementById('spath').step = 1;
     }
-    document.getElementById('service-name-3').innerText = VALUES_SERVICES[value];
+    // document.getElementById('service-name-3').innerText = VALUES_SERVICES[value];
 }
 function bestSettings() {
+    if (document.getElementById('stype').classList.contains('d-none'))
+        document.getElementById('slogs').value = 'easips.log';
     let service = document.getElementById('stype').value;
     if (service === 'ssh') {
         document.getElementById('slogs').value = '/var/log/auth.log';
@@ -197,6 +217,12 @@ function updateHint() {
 }
 function saveServiceSettings(e, form) {
     e.preventDefault();
+    let validPath = (document.getElementById('spath').value ?? '').includes('/');
+    if (document.getElementById('stype').classList.contains('d-none') && document.getElementById('slock').value === 'htaccess' && !validPath) {
+        document.getElementById('err-path').classList.remove('d-none')
+        return;
+    } else
+        document.getElementById('err-path').classList.add('d-none')
     sload.classList.replace('d-none', 'd-block');
     sform.classList.replace('d-block', 'd-none');
     ssave.disabled = true;
@@ -236,7 +262,10 @@ function confirmDeletion() {
             loadData(true);
         },
         error: function(err, _, __) {
-            modalResult("Couldn't delete (" + err.status + " error)");
+            let error_message = "Couldn't delete (" + err.status + " error)";
+            if (err.status === 401)
+                error_message = "EasIPS service can't be deleted! You can stop it but we discourage doing so";
+            modalResult(error_message);
             loadData(true);
         }
     })
