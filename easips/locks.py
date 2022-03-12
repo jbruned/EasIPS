@@ -1,4 +1,3 @@
-import subprocess as sub
 from abc import ABC, abstractmethod
 from typing import Union
 from easips.util import system_call
