@@ -11,11 +11,24 @@ class InvalidSettingsException(Exception):
     pass
 
 
-def system_call(command: str, show_output: bool = False) -> bool:
+def modify_ufw_rule(command: str, show_output: bool = False) -> bool:
     """
     Performs a system call using a bash command and returns True if successful (if the return code is 0)
     """
-    return subprocess.run(command.split(' '), capture_output=not show_output).returncode == 0
+    result = subprocess.run(command.split(' '), capture_output=not show_output).returncode == 0
+
+    if not result:
+        # Allow empty rule such that we can use insert at index
+        subprocess.run('sudo ufw deny to any port 8888 proto tcp'.split(' '))
+        result = subprocess.run(command.split(' '), capture_output=not show_output).returncode == 0
+    return result
+
+
+def system_call(command: str, show_output: bool = False) -> None:
+    """
+    Performs a system call using a bash command and does not throw an error if successful (if the return code is 0)
+    """
+    assert subprocess.run(command.split(' '), capture_output=not show_output).returncode == 0
 
 
 def datetime_difference(a: datetime, b: datetime = None) -> str:

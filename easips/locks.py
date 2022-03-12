@@ -1,7 +1,8 @@
+import subprocess
 from abc import ABC, abstractmethod
 from typing import Union
 
-from easips.util import system_call
+from easips.util import modify_ufw_rule, system_call
 
 BLOCKED_HTML = "<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1, shrink-to-fit=no'>" \
                "<title>Forbidden | EasIPS</title><link href='./assets/bootstrap.min.css' rel='stylesheet'>" \
@@ -40,19 +41,23 @@ class FirewallLock(ServiceLock):
     Note: root permissions are required to edit the required firewall settings
     """
 
-    def __init__(self, port: Union[int, str], protocol: str = "tcp"):
+    def __init__(self, port: int, protocol: str = "tcp"):
         # TODO: possibility to allow port ranges
-        assert port.isnumeric()
-        self.port = int(port)
+        self.port = port
         assert 0 <= port <= 65535
         self.proto = protocol
+        assert subprocess.run(['sudo', 'ufw', 'enable'], capture_output=False).returncode == 0
 
     def block(self, ip_addr: Union[str, list]) -> bool:
         if not isinstance(ip_addr, list):
             ip_addr = [ip_addr]
         success = True
         for single_ip in ip_addr:
-            success &= system_call(f"ufw insert 1 deny from {single_ip} to any port {self.port} proto {self.proto}")
+            success &= modify_ufw_rule(f"ufw insert 1 deny from {single_ip} to any port {self.port} proto {self.proto}", True)
+            try:
+                system_call(f"iptables -I DOCKER -s {single_ip} -p tcp --dport {self.port} -j DROP")  # in case docker is used (docker avoid ufw)
+            except:
+                pass
         return success
 
     def unblock(self, ip_addr: Union[str, list]) -> bool:
@@ -60,7 +65,11 @@ class FirewallLock(ServiceLock):
             ip_addr = [ip_addr]
         success = True
         for single_ip in ip_addr:
-            success &= system_call(f"ufw delete deny from {single_ip} to any port {self.port} proto {self.proto}")
+            success &= modify_ufw_rule(f"ufw delete deny from {single_ip} to any port {self.port} proto {self.proto}")
+            try:
+                system_call(f"iptables -D DOCKER -s {single_ip} -p tcp --dport {self.port} -j DROP")  # in case docker is used (docker avoid ufw)
+            except:
+                pass
         return success
 
 
