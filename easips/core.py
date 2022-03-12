@@ -35,12 +35,13 @@ class ProtectedService:
         """
         if self.settings.service == 'easips':
             self.lock = None
-        elif self.settings.path.isNumeric():
-            self.lock = FirewallLock(int(self.settings.path))
+        elif self.settings.path.isnumeric():
+            self.lock = FirewallLock(int(self.settings.lock_resource))
         elif '/' in self.settings.path:
-            self.lock = HTAccessLock(self.settings.path)
+            self.lock = HTAccessLock(self.settings.lock_resource,
+                                     f"easips/web/blocked_{'temp' if self.settings.block_duration else 'perm'}.html")
         else:
-            self.lock = EtcHostsLock(self.settings.web_path)
+            self.lock = EtcHostsLock(self.settings.lock_resource)
 
     _REGEX_LIST = {  # service_name: list_of_regex
         'joomla': [
@@ -78,7 +79,7 @@ class ProtectedService:
         try:
             self._get_tracker()
             self._get_lock()
-        except Exception as e:
+        except:
             self.login_tracker = None
             self.lock = None
             if not self.settings.stopped:

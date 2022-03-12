@@ -11,20 +11,17 @@ class InvalidSettingsException(Exception):
     pass
 
 
-def modify_ufw_rule(command: str, show_output: bool = False) -> bool:
+def modify_ufw_rule(command: str) -> bool:
     """
-    Performs a system call using a bash command and returns True if successful (if the return code is 0)
+    Allows empty rule such that we can use insert at index
     """
-    result = subprocess.run(command.split(' '), capture_output=not show_output).returncode == 0
-
-    if not result:
-        # Allow empty rule such that we can use insert at index
-        subprocess.run('sudo ufw deny to any port 8888 proto tcp'.split(' '))
-        result = subprocess.run(command.split(' '), capture_output=not show_output).returncode == 0
-    return result
+    if system_call(command):
+        return True
+    system_call('sudo ufw deny to any port 8888 proto tcp')
+    return system_call(command)
 
 
-def system_call(command: str, show_output: bool = False) -> None:
+def system_call(command: str, show_output: bool = False) -> bool:
     """
     Performs a system call using a bash command and does not throw an error if successful (if the return code is 0)
     """
