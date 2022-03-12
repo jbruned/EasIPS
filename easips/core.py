@@ -78,6 +78,7 @@ class ProtectedService:
             self.lock = None
             if not self.settings.stopped:
                 self.toggle_stopped(True)
+            print(e)
             print(f"[Error] Couldn't initialize service '{self.settings.name}', thus it has been stopped", file=stderr)
             raise InvalidSettingsException
 
