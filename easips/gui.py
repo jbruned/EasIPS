@@ -30,8 +30,11 @@ class WebGUI:
         def get_hashed_password(password: str) -> str:
             return password  # TODO: get actual password hash
 
-        def is_password_correct(password: str) -> bool:
-            return password == self.settings.admin_password  # TODO: check password hash instead
+        def is_password_correct(password: str, ip_addr=None) -> bool:
+            correct = password == self.settings.admin_password  # TODO: check password hash instead
+            if not correct and ip_addr is not None:
+                log_warning(f"Failed login attempt from {str(ip_addr).lower()}")
+            return correct
 
         settings_query = AppSettings.query
         if not settings_query.all():
@@ -48,8 +51,8 @@ class WebGUI:
         def logged_in():
             return True  # TODO: check if the user is logged in
 
-        def ip_is_blocked(request):
-            return self.ips_instance.get_easips_service().is_blocked(request.remote_addr)
+        def ip_is_blocked(ip_addr):
+            return self.ips_instance.get_easips_service().is_blocked(str(ip_addr).lower())
 
         @self.app.route('/')
         def dashboard():
@@ -59,18 +62,18 @@ class WebGUI:
 
         @self.app.route('/login', methods=['POST'])
         def login():
-            if is_password_correct(request.form['password']):
+            if is_password_correct(request.form['password'], request.remote_addr):
                 pass  # TODO: start user session
             return redirect("/")
 
         @self.app.route('/API/password', methods=['POST'])
         def change_password():
-            if ip_is_blocked(request):
+            if ip_is_blocked(request.remote_addr):
                 return send_file('web/blocked.html'), 403
             if not request.form['old'] or len(request.form['new'] or '') < 5 or len(request.form['repeat'] or '') < 5 \
                     or request.form['new'] != request.form['repeat']:
                 abort(400)
-            if not is_password_correct(request.form['old']):
+            if not is_password_correct(request.form['old'], request.remote_addr):
                 abort(401)
             self.settings.admin_password = get_hashed_password(request.form['new'])
             db.session.merge(self.settings)
@@ -84,7 +87,7 @@ class WebGUI:
 
         @self.app.route('/service/<service_id>')
         def service(service_id):
-            if ip_is_blocked(request):
+            if ip_is_blocked(request.remote_addr):
                 abort(403)
             try:
                 self.ips_instance.get_service(int(service_id))
@@ -97,7 +100,7 @@ class WebGUI:
         @self.app.route('/API/services/', methods=['GET', 'POST'])
         @self.app.route('/API/services/<service_id>', methods=['GET', 'POST', 'DELETE'])
         def api_service(service_id=None):
-            if ip_is_blocked(request):
+            if ip_is_blocked(request.remote_addr):
                 abort(403)
             try:
                 if service_id is not None:
@@ -145,7 +148,7 @@ class WebGUI:
 
         @self.app.route('/API/services/<service_id>/playpause', methods=['POST'])
         def toggle_running(service_id):
-            if ip_is_blocked(request):
+            if ip_is_blocked(request.remote_addr):
                 abort(403)
             try:
                 self.ips_instance.get_service(int(service_id)).toggle_stopped()
@@ -159,7 +162,7 @@ class WebGUI:
 
         @self.app.route('/API/services/<service_id>/blocked', methods=['POST'])
         def block_unblock(service_id):
-            if ip_is_blocked(request):
+            if ip_is_blocked(request.remote_addr):
                 abort(403)
             try:
                 s = self.ips_instance.get_service(int(service_id))
@@ -178,7 +181,7 @@ class WebGUI:
 
         @self.app.route('/API/services/<service_id>/blocked', methods=['GET'])
         def blocked_ips(service_id):
-            if ip_is_blocked(request):
+            if ip_is_blocked(request.remote_addr):
                 abort(403)
             try:
                 return json.dumps(self.ips_instance.get_service(int(service_id)).get_blocked_ips(
