@@ -9,7 +9,7 @@ from sqlalchemy import desc
 
 from easips.db import ServiceSettings, LoginAttempt, BlockedIP
 from easips.locks import ServiceLock, HTAccessLock, FirewallLock, EtcHostsLock
-from easips.log import debug
+from easips.log import debug, log_error, log_warning, log_info
 from easips.login_trackers import LoginTracker, LogSniffer
 from easips.util import ip_addr_is_valid, datetime_difference, InvalidSettingsException, NotFoundException
 
@@ -86,7 +86,7 @@ class ProtectedService:
             self.lock = None
             if not self.settings.stopped:
                 self.toggle_stopped(True)
-            print(f"[Error] Couldn't initialize service '{self.settings.name}', thus it has been stopped", file=stderr)
+            log_error(f"Couldn't initialize service '{self.settings.name}', thus it has been stopped")
             raise InvalidSettingsException
 
     def are_components_initialized(self) -> bool:
@@ -148,10 +148,10 @@ class ProtectedService:
         timestamp = timestamp or datetime.now()
 
         if not ip_addr_is_valid(ip_addr):
-            print(f"[Warning] {ip_addr} is not a valid IP address to log")
+            log_warning(f"{ip_addr} is not a valid IP address to log")
         elif self.is_blocked(ip_addr):
-            print(f"[Warning] {ip_addr} is supposed to be blocked from '{self.settings.name}' "
-                  "but a login attempt has been detected")
+            log_warning(f"{ip_addr} is supposed to be blocked from '{self.settings.name}' "
+                        "but a login attempt has been detected")
         else:
             db.session.add(LoginAttempt(
                 service_id=self.settings.id,
@@ -185,14 +185,14 @@ class ProtectedService:
         else:
             ip_addr = ip_addr.lower()
             if not ip_addr_is_valid(ip_addr):
-                print(f"[Warning] {ip_addr} is not a valid IP address to block")
+                log_warning(f"{ip_addr} is not a valid IP address to block")
             elif self.is_blocked(ip_addr):
                 obj = BlockedIP.query.filter(BlockedIP.service_id == self.settings.id, BlockedIP.ip_addr == ip_addr,
                                              BlockedIP.active).first()
                 obj.blocked_at = timestamp
                 # db.session.add(obj)
                 db.session.commit()
-                print(f"[Info] {ip_addr} was already blocked from '{self.settings.name}', time is now updated")
+                log_info(f"{ip_addr} was already blocked from '{self.settings.name}', time is now updated")
             elif self.settings.service == 'easips' or self.lock.block(ip_addr):
                 db.session.add(BlockedIP(
                     service_id=self.settings.id,
@@ -201,9 +201,9 @@ class ProtectedService:
                     active=True
                 ))
                 db.session.commit()
-                print(f"[Info] {ip_addr} has been successfully blocked from service '{self.settings.name}'")
+                log_info(f"{ip_addr} has been successfully blocked from service '{self.settings.name}'")
             else:
-                print(f"[Error] {ip_addr} couldn't be blocked from service '{self.settings.name}'", file=stderr)
+                log_error(f"{ip_addr} couldn't be blocked from service '{self.settings.name}'")
 
     def unblock(self, ip_addr: Union[str, list], db: SQLAlchemy, timestamp: Union[datetime, None] = None):
         """
@@ -216,18 +216,18 @@ class ProtectedService:
         else:
             ip_addr = ip_addr.lower()
             if not ip_addr_is_valid(ip_addr):
-                warn(f"[Warning] {ip_addr} is not a valid IP address to unblock")
+                log_warning(f"{ip_addr} is not a valid IP address to unblock")
             elif not self.is_blocked(ip_addr):
-                print(f"[Info] Attempted to unblock not blocked address {ip_addr} from service '{self.settings.name}'")
+                log_info(f"Attempted to unblock not blocked address {ip_addr} from service '{self.settings.name}'")
             elif self.settings.service == 'easips' or self.lock.unblock(ip_addr):
                 query = BlockedIP.query.filter(BlockedIP.service_id == self.settings.id, BlockedIP.ip_addr == ip_addr,
                                                BlockedIP.active)
                 for obj in query.all():
                     obj.active = False
                 db.session.commit()
-                print(f"[Info] {ip_addr} has been successfully unblocked from service '{self.settings.name}'")
+                log_info(f"{ip_addr} has been successfully unblocked from service '{self.settings.name}'")
             else:
-                print(f"[Error] {ip_addr} couldn't be unblocked from service '{self.settings.name}'", file=stderr)
+                log_error(f"{ip_addr} couldn't be unblocked from service '{self.settings.name}'")
 
     def is_blocked(self, ip_addr: Union[str, list]) -> Union[bool, list]:
         """
@@ -239,7 +239,7 @@ class ProtectedService:
         ip_addr = ip_addr.lower()
 
         if not ip_addr_is_valid(ip_addr):
-            warn(f"[Warning] {ip_addr} is not a valid IP address to check")
+            log_warning(f"{ip_addr} is not a valid IP address to check")
             return False
 
         return len(BlockedIP.query.filter(BlockedIP.service_id == self.settings.id, BlockedIP.ip_addr == ip_addr,

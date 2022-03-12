@@ -7,6 +7,7 @@ from flask_sqlalchemy import SQLAlchemy
 
 from easips.core import ProtectedService, BackgroundIPS
 from easips.db import ServiceSettings, AppSettings
+from easips.log import log_warning
 from easips.util import InvalidSettingsException, NotFoundException
 
 
@@ -41,8 +42,8 @@ class WebGUI:
         self.settings = AppSettings.query.first()
 
         if is_password_correct(self._DEFAULT_ADMIN_PASSWORD):
-            print(f"[Warning] Admin password is set to default: {self._DEFAULT_ADMIN_PASSWORD}\n"
-                  f"          Please change it from the GUI")
+            log_warning(f"Admin password is set to default: {self._DEFAULT_ADMIN_PASSWORD}\n"
+                        "          Please change it from the GUI")
 
         def logged_in():
             return True  # TODO: check if the user is logged in
