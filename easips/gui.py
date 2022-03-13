@@ -14,7 +14,7 @@ from easips.util import InvalidSettingsException, NotFoundException
 
 class WebGUI:
     _DEFAULT_ADMIN_PASSWORD = "admin"
-    _PASSWORD_SALT = "salt_easips"
+    _PASSWORD_SALT = "07fb9ac85a8a2480355aa66e1c958f97"
 
     def __init__(self, ips_instance: BackgroundIPS, db: SQLAlchemy):
 
@@ -26,7 +26,7 @@ class WebGUI:
         db.init_app(self.app)
         self.app.app_context().push()
         # We first have to set the secret key for the session
-        self.app.secret_key = "super secret key"
+        self.app.secret_key = "c8648b0928e1a460370d30056520f265"
 
         Migrate(self.app, db)
         db.create_all()
