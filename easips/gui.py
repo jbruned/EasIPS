@@ -10,6 +10,7 @@ from easips.db import ServiceSettings, AppSettings
 from easips.log import log_warning
 from easips.util import InvalidSettingsException, NotFoundException
 
+
 import hashlib
 
 
@@ -27,16 +28,18 @@ class WebGUI:
         self.app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
         db.init_app(self.app)
         self.app.app_context().push()
+        #We first have to set the secret key for the session
+        self.app.secret_key = "super secret key" 
 
         Migrate(self.app, db)
         db.create_all()
 
         def get_hashed_password(password: str) -> str:
             password = hashlib.md5(password.encode()).hexdigest()
-            return password  # TODO: get actual password hash
+            return password  
 
         def is_password_correct(password: str, ip_addr=None) -> bool:
-            correct = (hashlib.md5(password.encode()).hexdigest() == self.settings.admin_password)  # TODO: check password hash instead
+            correct = (get_hashed_password(password) == self.settings.admin_password)  
             if not correct and ip_addr is not None:
                 log_warning(f"Failed login attempt from {str(ip_addr).lower()}")
             return correct
@@ -44,6 +47,7 @@ class WebGUI:
 
         settings_query = AppSettings.query
         if not settings_query.all():
+
             db.session.add(AppSettings(
                 admin_password=get_hashed_password(self._DEFAULT_ADMIN_PASSWORD)
             ))  # load default app config on first run
@@ -55,10 +59,10 @@ class WebGUI:
                         "          Please change it from the GUI")
 
         def logged_in():
-            if "admin" in session:
-                return True  # TODO: check if the user is logged in
+            if session.get("admin") is None:
+                return False  
             else:
-                return False
+                return True
 
         def ip_is_blocked(ip_addr):
             return self.ips_instance.get_easips_service().is_blocked(str(ip_addr).lower())
@@ -66,13 +70,14 @@ class WebGUI:
         @self.app.route('/')
         def dashboard():
             if not logged_in():
-                send_file("web/login.html")
-            return send_file("web/dashboard.html")
+                return send_file("web/login.html")
+            else:
+                return send_file("web/dashboard.html")
 
         @self.app.route('/login', methods=['POST'])
         def login():
             if is_password_correct(request.form['password'], request.remote_addr):
-                session["admin"] = "admin" # TODO: start user session
+                session["admin"] = "admin" 
             return redirect("/")
 
         @self.app.route('/API/password', methods=['POST'])
@@ -91,7 +96,6 @@ class WebGUI:
 
         @self.app.route('/logout')
         def logout():
-            # TODO: end user session if exists
             session.pop("admin",None)
             return redirect("/")
 
