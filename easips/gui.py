@@ -1,7 +1,7 @@
 import json
 from logging import getLogger, CRITICAL
 
-from flask import Flask, send_file, abort, request, redirect, send_from_directory
+from flask import Flask, send_file, abort, request, redirect, send_from_directory, session
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 
@@ -10,12 +10,16 @@ from easips.db import ServiceSettings, AppSettings
 from easips.log import log_warning
 from easips.util import InvalidSettingsException, NotFoundException
 
+import hashlib
+
 
 class WebGUI:
 
     _DEFAULT_ADMIN_PASSWORD = "admin"
 
     def __init__(self, ips_instance: BackgroundIPS, db: SQLAlchemy):
+        
+
         self.ips_instance = ips_instance
         self.app = Flask(__name__)
         getLogger('werkzeug').setLevel(CRITICAL)
@@ -28,13 +32,15 @@ class WebGUI:
         db.create_all()
 
         def get_hashed_password(password: str) -> str:
+            password = hashlib.md5(password.encode()).hexdigest()
             return password  # TODO: get actual password hash
 
         def is_password_correct(password: str, ip_addr=None) -> bool:
-            correct = password == self.settings.admin_password  # TODO: check password hash instead
+            correct = (hashlib.md5(password.encode()).hexdigest() == self.settings.admin_password)  # TODO: check password hash instead
             if not correct and ip_addr is not None:
                 log_warning(f"Failed login attempt from {str(ip_addr).lower()}")
             return correct
+        
 
         settings_query = AppSettings.query
         if not settings_query.all():
@@ -49,7 +55,10 @@ class WebGUI:
                         "          Please change it from the GUI")
 
         def logged_in():
-            return True  # TODO: check if the user is logged in
+            if "admin" in session:
+                return True  # TODO: check if the user is logged in
+            else:
+                return False
 
         def ip_is_blocked(ip_addr):
             return self.ips_instance.get_easips_service().is_blocked(str(ip_addr).lower())
@@ -63,7 +72,7 @@ class WebGUI:
         @self.app.route('/login', methods=['POST'])
         def login():
             if is_password_correct(request.form['password'], request.remote_addr):
-                pass  # TODO: start user session
+                session["admin"] = "admin" # TODO: start user session
             return redirect("/")
 
         @self.app.route('/API/password', methods=['POST'])
@@ -83,6 +92,7 @@ class WebGUI:
         @self.app.route('/logout')
         def logout():
             # TODO: end user session if exists
+            session.pop("admin",None)
             return redirect("/")
 
         @self.app.route('/service/<service_id>')

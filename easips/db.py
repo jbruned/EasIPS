@@ -36,4 +36,3 @@ class BlockedIP(db.Model):
     service_id = db.Column(db.Integer, db.ForeignKey('services.id', ondelete='CASCADE'), nullable=False)
     ip_addr = db.Column(db.String(30), nullable=False)
     blocked_at = db.Column(db.DateTime, nullable=True)  # null means infinitely blocked
-    active = db.Column(db.Boolean, nullable=False)
