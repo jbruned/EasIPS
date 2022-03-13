@@ -162,9 +162,11 @@ function selectService() {
     document.getElementById('external-service-settings').innerText = value + " installation settings";
     document.getElementById('option-htaccess').disabled = service === 'ssh';
 }
-function selectLock() {
+function selectLock(from_select = false) {
     if (document.getElementById('stype').classList.contains('d-none'))
         return;
+    if (from_select)
+        document.getElementById('spath').value = '';
     let value = document.getElementById('slock').value;
     if (value === 'htaccess' || value === 'hosts') {
         document.getElementById('lock-arg-name').innerText = value === 'htaccess' ? "Web folder path" : "Daemon name";
@@ -217,12 +219,25 @@ function updateHint() {
 }
 function saveServiceSettings(e, form) {
     e.preventDefault();
-    let validPath = (document.getElementById('spath').value ?? '').includes('/');
-    if (document.getElementById('stype').classList.contains('d-none') && document.getElementById('slock').value === 'htaccess' && !validPath) {
-        document.getElementById('err-path').classList.remove('d-none')
-        return;
-    } else
-        document.getElementById('err-path').classList.add('d-none')
+    if (!document.getElementById('stype').classList.contains('d-none')) {
+        if (document.getElementById('slock').value === 'htaccess'
+            && !(document.getElementById('spath').value ?? '').includes('/')) {
+            document.getElementById('err-path').innerText = "Path must contain '/'";
+            document.getElementById('err-path').classList.remove('d-none')
+            return;
+        } else if(document.getElementById('slock').value === 'hosts'
+                  && !isNaN(document.getElementById('spath').value)) {
+            document.getElementById('err-path').innerText = "Name can't be a number";
+            document.getElementById('err-path').classList.remove('d-none')
+            return;
+        } else if(document.getElementById('slock').value === 'hosts'
+                  && document.getElementById('spath').value.includes(' ')) {
+            document.getElementById('err-path').innerText = "Name can't have spaces";
+            document.getElementById('err-path').classList.remove('d-none')
+            return;
+        } else
+            document.getElementById('err-path').classList.add('d-none')
+    }
     sload.classList.replace('d-none', 'd-block');
     sform.classList.replace('d-block', 'd-none');
     ssave.disabled = true;

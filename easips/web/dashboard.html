@@ -119,7 +119,7 @@
                                                               Daemon-wise firewall: block a service (only if you know the daemon name)<br><br>
                                                               Path-wise web lock: block a path of your website (only if it's running on Apache)"></i>
                                                 </label>
-                                                <select class="form-select" name="lock" id="slock" required onchange="selectLock()">
+                                                <select class="form-select" name="lock" id="slock" required onchange="selectLock(true)">
                                                     <option disabled selected></option>
                                                     <option value="firewall">Port-wise firewall</option>
                                                     <option value="hosts">Daemon-wise firewall</option>
@@ -129,7 +129,7 @@
                                             <div class="col-sm-6">
                                                 <label for="spath" class="form-label mb-0" id="lock-arg-name">Web root path</label>
                                                 <input type="text" class="form-control" id="spath" name="lock_resource">
-                                                <div class="d-none text-danger small mt-0" id="err-path">Path must contain '/'</div>
+                                                <div class="d-none text-danger small mt-0" id="err-path">Invalid input</div>
                                             </div>
                                         </div>
                                         <div class="text-center">

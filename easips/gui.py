@@ -13,6 +13,7 @@ from easips.util import InvalidSettingsException, NotFoundException
 
 
 class WebGUI:
+
     _DEFAULT_ADMIN_PASSWORD = "admin"
     _PASSWORD_SALT = "07fb9ac85a8a2480355aa66e1c958f97"
 
@@ -42,6 +43,7 @@ class WebGUI:
             return False
 
         settings_query = AppSettings.query
+        # To restore default settings: settings_query.delete()
         if not settings_query.all():
             db.session.add(AppSettings(
                 admin_password=get_hashed_password(self._DEFAULT_ADMIN_PASSWORD)

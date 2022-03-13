@@ -343,7 +343,7 @@ class BackgroundIPS:
                 self.add_service(s)
             if len(self.services) == 0:
                 self.add_service(ServiceSettings(
-                    name="EasIPS admin panel",
+                    name="EasIPS Admin Panel",
                     service="easips",
                     time_threshold=5,
                     max_attempts=5,
