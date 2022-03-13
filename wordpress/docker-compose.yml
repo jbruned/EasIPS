@@ -17,7 +17,8 @@ services:
       - wordpressdb
     image: wordpress:latest
     volumes:
-      - "./webserver:/var"
+      - "./webserver/var/log:/var/log"
+      - "./webserver/var/www/html:/var/www/html"
     ports:
       - "8083:80"
     restart: always
