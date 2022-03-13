@@ -10,3 +10,4 @@
 /wordpress/webserver/
 /ssh/logs/
 *easips.db
+*easips.log
