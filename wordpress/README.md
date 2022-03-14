@@ -1,6 +1,5 @@
 # WordPress Docker Container
-WordPress docker-compose.yml template is inspired by:  
->https://tecadmin.net/docker-compose-for-mysql-with-phpmyadmin/
+WordPress docker-compose.yml template is inspired by: https://docs.docker.com/samples/wordpress/
 
 # General Information
 
@@ -14,7 +13,7 @@ Shutdown Wordpress container and MySQL container
 ```
 sudo docker compose down
 ```
-## Links and information
+## Installation
 
 Website to access PHPMyAdmin webserver:
 ><localhost:8083>
@@ -37,18 +36,22 @@ Email
 
 Press Install WordPress
 
-### Volumes
+## Volumes
 
 The volume of /var/www/html of the Wordpress container is now found in 
->./webserver
+>./webserver/var/www/html
+
+The volume of /var/logs of Wordpress container can be found in
+>./webserver/var/log
 
 The volume of for the MySQL container can be found in 
 >./database
 
 <br/>
 
-### Logs
+## Logs
+Apache 2 Logs can be found at 
+>[./webserver/var/log/apache2/access.log](./webserver/var/log/apache2/access.log)
 
-Logs can be found in 
-TODO: Find logs
-Apache logs are in /var/logs/apache. But these do not suffice
+The .htaccess can be found in 
+>[./webserver/var/www/html/.htaccess](./webserver/var/www/html/.htaccess)
