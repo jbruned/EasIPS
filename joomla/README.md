@@ -1,9 +1,6 @@
 # Joomla Docker Container
 
-joomla-docker tutorial used: 
->https://www.hamrodev.com/en/app-development/joomla-docker-tutorial
-
-
+Docker-compose file is inspired by: >https://www.hamrodev.com/en/app-development/joomla-docker-tutorial
 
 # General Information
 
@@ -114,25 +111,3 @@ Connection Encryption
 >Default
 
 <br/>
-
-## 3. Setup SSH
-
-### I have some problems with this :(
-### This keeps giving me an: Unable to connect to port 443 error.
-
-### 3a. Go to <localhost:8081/administrator>
-
-### 3b. Use the following login credentials to login:
-
-Username: 
-> superuser
-> 
-Password
-> superuser123
-
-### 3c. Go to system->Global Configurations->Server
-
-### 3d. Set Force HTTPS to *Administrator only*
-
-### 3e. Save and Close
-
