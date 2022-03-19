@@ -44,6 +44,8 @@ class ProtectedService:
         else:
             self.lock = EtcHostsLock(self.settings.lock_resource)
 
+    # Do not remove the following comment, it enables color coding for regular expressions in JetBrains IDEs
+    # language=regexp
     _REGEX_LIST = {  # service_name: list_of_regex
         'joomla': [
             # Detect joomla in error log
@@ -63,7 +65,8 @@ class ProtectedService:
             r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*POST\s/index\.php.*\s200\s\d+.*'
         ],
         'easips': [
-            r'regex'  # TODO: EasIPS regular expression
+            #[Warning] Failed login attempt to the admin panel from 127.0.0.1
+            r'\[Warning]\sFailed\slogin\sattempt\sto\sthe\sadmin\spanel\sfrom\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'
         ]
     }
 

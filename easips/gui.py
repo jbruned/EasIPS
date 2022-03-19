@@ -64,7 +64,7 @@ class WebGUI:
         @self.app.route('/')
         def dashboard():
             if ip_is_blocked(request.remote_addr):
-                return send_file('web/blocked.html'), 403
+                return send_file('web/blocked_temp.html'), 403
             if not logged_in():
                 return send_file("web/login.html")
             return send_file("web/dashboard.html")
@@ -99,7 +99,7 @@ class WebGUI:
             if not logged_in():
                 return redirect(url_for('dashboard'))
             if ip_is_blocked(request.remote_addr):
-                return send_file('web/blocked.html'), 403
+                return send_file('web/blocked_temp.html'), 403
             try:
                 self.ips_instance.get_service(int(service_id))
             except ValueError:
