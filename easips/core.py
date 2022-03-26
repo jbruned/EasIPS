@@ -57,8 +57,8 @@ class ProtectedService:
         ],
         'ssh': [
             # Detect in log from rsyslog
-            r'^\w{3}\s*\d{1,2}\s\d{2}:\d{2}:\d{2}\ssshserver.*repeated\s(\d+)\stimes.*Fail.*password.*\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*',
-            r'^\w{3}\s*\d{1,2}\s\d{2}:\d{2}:\d{2}\ssshserver.*Fail.*password.*\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*',
+            r'^\w{3}\s*\d{1,2}\s\d{2}:\d{2}:\d{2}.*ssh.*repeated\s(\d+)\stimes.*Fail.*password.*\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*',
+            r'^\w{3}\s*\d{1,2}\s\d{2}:\d{2}:\d{2}.*ssh.*Fail.*password.*\s(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*',
         ],
         'phpmyadmin': [
             # Detect specific apache log lines
