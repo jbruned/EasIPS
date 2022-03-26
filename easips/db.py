@@ -35,5 +35,14 @@ class BlockedIP(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     service_id = db.Column(db.Integer, db.ForeignKey('services.id', ondelete='CASCADE'), nullable=False)
     ip_addr = db.Column(db.String(30), nullable=False)
-    blocked_at = db.Column(db.DateTime, nullable=True)  # null means infinitely blocked
+    blocked_at = db.Column(db.DateTime, nullable=False)
     active = db.Column(db.Boolean, nullable=False)
+
+
+class StaticRule(db.Model):
+    __tablename__ = "static_rules"
+    id = db.Column(db.Integer, primary_key=True)
+    service_id = db.Column(db.Integer, db.ForeignKey('services.id', ondelete='CASCADE'), nullable=False)
+    ip_addr = db.Column(db.String(30), nullable=False)
+    added_at = db.Column(db.DateTime, nullable=False)
+    blocked = db.Column(db.Boolean, nullable=False)

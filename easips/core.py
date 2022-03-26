@@ -7,7 +7,7 @@ from sys import stderr
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import desc
 
-from easips.db import ServiceSettings, LoginAttempt, BlockedIP
+from easips.db import ServiceSettings, LoginAttempt, BlockedIP, StaticRule
 from easips.locks import ServiceLock, HTAccessLock, FirewallLock, EtcHostsLock
 from easips.log import debug, log_error, log_warning, log_info
 from easips.login_trackers import LoginTracker, LogSniffer
@@ -189,6 +189,10 @@ class ProtectedService:
             ip_addr = ip_addr.lower()
             if not ip_addr_is_valid(ip_addr):
                 log_warning(f"{ip_addr} is not a valid IP address to block")
+                return
+            static = self.is_blocked_static(ip_addr)
+            if static is not None:
+                log_warning(f"Tried to block {ip_addr}, which is in the {'blacklist' if static else 'whitelist'}")
             elif self.is_blocked(ip_addr):
                 obj = BlockedIP.query.filter(BlockedIP.service_id == self.settings.id, BlockedIP.ip_addr == ip_addr,
                                              BlockedIP.active).first()
@@ -220,6 +224,11 @@ class ProtectedService:
             ip_addr = ip_addr.lower()
             if not ip_addr_is_valid(ip_addr):
                 log_warning(f"{ip_addr} is not a valid IP address to unblock")
+                return
+            static = self.is_blocked_static(ip_addr)
+            if static is not None:
+                log_warning(f"Tried to unblock {ip_addr}, which is in {self.settings.name}'s "
+                            f"{'blacklist' if static else 'whitelist'}")
             elif not self.is_blocked(ip_addr):
                 log_info(f"Attempted to unblock not blocked address {ip_addr} from service '{self.settings.name}'")
             elif self.settings.service == 'easips' or self.lock.unblock(ip_addr):
@@ -231,6 +240,36 @@ class ProtectedService:
                 log_info(f"{ip_addr} has been successfully unblocked from service '{self.settings.name}'")
             else:
                 log_error(f"{ip_addr} couldn't be unblocked from service '{self.settings.name}'")
+
+    def create_static_rule(self, ip_addr: str, set_blocked: bool, db: SQLAlchemy):
+        is_blocked = self.is_blocked(ip_addr)
+        try:
+            if self.settings.service != 'easips':
+                if is_blocked and not set_blocked:
+                    self.lock.unblock(ip_addr)
+                elif not is_blocked and set_blocked:
+                    self.lock.unblock(ip_addr)
+            query = BlockedIP.query.filter(BlockedIP.service_id == self.settings.id, BlockedIP.ip_addr == ip_addr,
+                                           BlockedIP.active)
+            for obj in query.all():
+                obj.active = False
+        except:
+            pass
+        if self.is_blocked_static(ip_addr) is not None:
+            self.remove_static_rule(ip_addr, db)
+        db.session.add(StaticRule(
+            service_id=self.settings.id,
+            ip_addr=ip_addr,
+            added_at=datetime.now(),
+            blocked=set_blocked
+        ))
+        db.session.commit()
+        log_info(f"Added {ip_addr} to {self.settings.name}'s {'blacklist' if set_blocked else 'whitelist'}")
+
+    def remove_static_rule(self, ip_addr: str, db: SQLAlchemy):
+        StaticRule.query.filter(StaticRule.service_id == self.settings.id, StaticRule.ip_addr == ip_addr).delete()
+        if db is not None:
+            db.session.commit()
 
     def is_blocked(self, ip_addr: Union[str, list]) -> Union[bool, list]:
         """
@@ -245,8 +284,16 @@ class ProtectedService:
             log_warning(f"{ip_addr} is not a valid IP address to check")
             return False
 
+        static = self.is_blocked_static(ip_addr)
+        if static is not None:
+            return static
+
         return len(BlockedIP.query.filter(BlockedIP.service_id == self.settings.id, BlockedIP.ip_addr == ip_addr,
                                           BlockedIP.active).all()) > 0
+
+    def is_blocked_static(self, ip_addr: str) -> bool:
+        static = StaticRule.query.filter(StaticRule.service_id == self.settings.id, StaticRule.ip_addr == ip_addr)
+        return static.first().blocked if len(static.all()) > 0 else None
 
     def refresh(self, db, timestamp: Union[datetime, None] = None):
         """
@@ -276,6 +323,14 @@ class ProtectedService:
         if not new_value:
             self.init_components()
 
+    def get_static_rules(self, only_blocked: bool = False) -> list:
+        results = StaticRule.query.filter(StaticRule.service_id == self.settings.id).all()
+        return [result.ip_addr for result in results if result.blocked] if only_blocked else [{
+            'ip_address': result.ip_addr,
+            'blocked': result.blocked,
+            'added_at': str(result.added_at)
+        } for result in results]
+
     def get_blocked_ips(self, last_24h: bool = False, historic: bool = False):
         timestamp = datetime.now()
         if historic:  # Return also older IPs
@@ -289,6 +344,9 @@ class ProtectedService:
         return [
             {'ip_address': single_ip.ip_addr, 'blocked_at': single_ip.blocked_at, 'active': single_ip.active}
             for single_ip in blocked_ips.order_by(desc(BlockedIP.blocked_at))
+        ] + [
+            {'ip_address': ip_addr, 'blocked_at': 'Blacklisted', 'active': True}
+            for ip_addr in self.get_static_rules(True)
         ]
 
     def get_last_blocked(self):
