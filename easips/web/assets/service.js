@@ -86,7 +86,7 @@ function loadIp (address, block_time, active) {
         "                        <td>" + block_time + "</td>\n" +
         "                        <td>" + (active ? 'Active' : 'Unblocked') + "</td>\n" +
         '                        <td' + (active ? '' : ' style="cursor: not-allowed;"') + '>' +
-        '                            <a class="btn btn-' + (active ? 'primary' : 'secondary disabled') + '" href="javascript:blockUnblock(\'' + address + '\', false, ' + (block_time === 'Blacklisted' ? 'true' : 'false') + ')"><i class="bi bi-unlock me-2"></i>Unblock</a>' +
+        '                            <a class="btn btn-' + (active ? 'primary' : 'secondary disabled') + '" href="javascript:' + (block_time === 'Blacklisted' ? ("removeStatic('" + address + "')") : ("blockUnblock('" + address + "', false, false)")) + '"><i class="bi bi-unlock me-2"></i>Unblock</a>' +
         '                            <a class="btn btn-primary" href="javascript:blockUnblock(\'' + address + '\', false, true)"><i class="bi bi-check2-circle me-2"></i>Whitelist</a>' +
         '                            <a class="btn btn-' + (block_time === 'Blacklisted' ? 'secondary disabled' : 'primary') + '" href="javascript:blockUnblock(\'' + address + '\', true, true)"><i class="bi bi-shield-x me-2"></i>Blacklist</a>' +
         '                        </td>\n' + // trash3
