@@ -11,6 +11,12 @@
 			cursor: not-allowed;
 			pointer-events: auto;
 		}
+        .btn-zoom:hover {
+            transform: scale(1.11);
+        }
+        .btn-zoom, .btn-zoom:hover {
+            transition: transform .15s;
+        }
 	</style>
 </head>
 
@@ -77,7 +83,7 @@
                         <div class="row mb-3">
 							<div class="col-sm-6">
                                 <label for="sname" class="form-label mb-0">Name</label>
-                                <input type="text" class="form-control" id="sname" name="name" placeholder="E.g.: Internal SSH Server">
+                                <input type="text" class="form-control" id="sname" name="name" placeholder="E.g.: Internal SSH Server" maxlength="30">
 							</div>
 							<div class="col-sm-6">
                                 <label for="stype" class="form-label mb-0">Type</label>
