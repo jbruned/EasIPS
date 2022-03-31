@@ -13,78 +13,72 @@ from easips.util import InvalidSettingsException, NotFoundException, ip_addr_is_
 
 
 class WebGUI:
+    """
+    Contains the implementation of the entire administration web GUI
+    """
 
     _DEFAULT_ADMIN_PASSWORD = "admin"
     _PASSWORD_SALT = "07fb9ac85a8a2480355aa66e1c958f97"
 
     def __init__(self, ips_instance: BackgroundIPS, db: SQLAlchemy):
-
+        """
+        Implementation of the WebGUI and all endpoints using Flask
+        @param ips_instance: thread which runs the IPS in the background and contains the ProtectedService list
+        @param db: database where all data is persisted
+        """
         self.ips_instance = ips_instance
         self.app = Flask(__name__)
         getLogger('werkzeug').setLevel(CRITICAL)
+        # Database configuration
         self.app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///easips.db?check_same_thread=False'
         self.app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
         db.init_app(self.app)
         self.app.app_context().push()
-        # We first have to set the secret key for the session
+        # Set the secret key for the Flask sessions
         self.app.secret_key = "c8648b0928e1a460370d30056520f265"
-
+        # Initialize database
         Migrate(self.app, db)
         db.create_all()
-
-        def get_hashed_password(password: str) -> str:
-            return hashlib.sha256((password + self._PASSWORD_SALT).encode()).hexdigest()
-
-        def is_password_correct(password: str, ip_addr=None) -> bool:
-            if get_hashed_password(password) == self.settings.admin_password:
-                return True
-            if ip_addr is not None:
-                log_warning(f"Failed login attempt to the admin panel from {str(ip_addr).lower()}")
-            return False
-
+        # Load app settings from the database
         settings_query = AppSettings.query
-        # To restore default settings: settings_query.delete()
+        # To restore default settings, uncomment this line:
+        # settings_query.delete()
         if not settings_query.all():
             db.session.add(AppSettings(
-                admin_password=get_hashed_password(self._DEFAULT_ADMIN_PASSWORD)
-            ))  # load default app config on first run
+                admin_password=self.get_hashed_password(self._DEFAULT_ADMIN_PASSWORD)
+            ))  # Create default app configuration on first startup
             db.session.commit()
         self.settings = AppSettings.query.first()
-
-        if is_password_correct(self._DEFAULT_ADMIN_PASSWORD):
+        # Warn about the default password if needed
+        if self.is_password_correct(self._DEFAULT_ADMIN_PASSWORD):
             log_warning(f"Admin password is set to default: {self._DEFAULT_ADMIN_PASSWORD}\n"
                         "          Please change it from the GUI")
 
-        def logged_in():
-            return session.get("admin") is not None
-
-        def ip_is_blocked(ip_addr):
-            return self.ips_instance.get_easips_service().is_blocked(str(ip_addr).lower())
-
+        # Define Flask endpoints (both views and API endpoints)
         @self.app.route('/')
         def dashboard():
-            if ip_is_blocked(request.remote_addr):
+            if self.ip_is_blocked(request.remote_addr):
                 return send_file('web/blocked_temp.html'), 403
-            if not logged_in():
+            if not self.logged_in():
                 return send_file("web/login.html")
             return send_file("web/dashboard.html")
 
         @self.app.route('/login', methods=['POST'])
         def login():
-            if is_password_correct(request.form['password'], request.remote_addr):
+            if self.is_password_correct(request.form['password'], request.remote_addr):
                 session["admin"] = "admin"
             return redirect(url_for('dashboard'))
 
         @self.app.route('/API/password', methods=['POST'])
         def change_password():
-            if ip_is_blocked(request.remote_addr):
+            if self.ip_is_blocked(request.remote_addr):
                 abort(403)
             if not request.form['old'] or len(request.form['new'] or '') < 5 or len(request.form['repeat'] or '') < 5 \
                     or request.form['new'] != request.form['repeat']:
                 abort(400)
-            if not is_password_correct(request.form['old'], request.remote_addr):
+            if not self.is_password_correct(request.form['old'], request.remote_addr):
                 abort(401)
-            self.settings.admin_password = get_hashed_password(request.form['new'])
+            self.settings.admin_password = self.get_hashed_password(request.form['new'])
             db.session.merge(self.settings)
             db.session.commit()
             return "", 200
@@ -96,9 +90,9 @@ class WebGUI:
 
         @self.app.route('/service/<service_id>')
         def service(service_id):
-            if not logged_in():
+            if not self.logged_in():
                 return redirect(url_for('dashboard'))
-            if ip_is_blocked(request.remote_addr):
+            if self.ip_is_blocked(request.remote_addr):
                 return send_file('web/blocked_temp.html'), 403
             try:
                 self.ips_instance.get_service(int(service_id))
@@ -111,9 +105,9 @@ class WebGUI:
         @self.app.route('/API/services/', methods=['GET', 'POST'])
         @self.app.route('/API/services/<service_id>', methods=['GET', 'POST', 'DELETE'])
         def api_service(service_id=None):
-            if not logged_in():
+            if not self.logged_in():
                 abort(401)
-            if ip_is_blocked(request.remote_addr):
+            if self.ip_is_blocked(request.remote_addr):
                 abort(403)
             try:
                 if service_id is not None:
@@ -161,9 +155,9 @@ class WebGUI:
 
         @self.app.route('/API/services/<service_id>/playpause', methods=['POST'])
         def toggle_running(service_id):
-            if not logged_in():
+            if not self.logged_in():
                 abort(401)
-            if ip_is_blocked(request.remote_addr):
+            if self.ip_is_blocked(request.remote_addr):
                 abort(403)
             try:
                 self.ips_instance.get_service(int(service_id)).toggle_stopped()
@@ -177,9 +171,9 @@ class WebGUI:
 
         @self.app.route('/API/services/<service_id>/blocked', methods=['POST'])
         def block_unblock(service_id):
-            if not logged_in():
+            if not self.logged_in():
                 abort(401)
-            if ip_is_blocked(request.remote_addr):
+            if self.ip_is_blocked(request.remote_addr):
                 abort(403)
             try:
                 s = self.ips_instance.get_service(int(service_id))
@@ -200,9 +194,9 @@ class WebGUI:
 
         @self.app.route('/API/services/<service_id>/static', methods=['POST'])
         def add_static_rule(service_id):
-            if not logged_in():
+            if not self.logged_in():
                 abort(401)
-            if ip_is_blocked(request.remote_addr):
+            if self.ip_is_blocked(request.remote_addr):
                 abort(403)
             try:
                 s = self.ips_instance.get_service(int(service_id))
@@ -220,9 +214,9 @@ class WebGUI:
 
         @self.app.route('/API/services/<service_id>/static', methods=['DELETE'])
         def remove_static_rule(service_id):
-            if not logged_in():
+            if not self.logged_in():
                 abort(401)
-            if ip_is_blocked(request.remote_addr):
+            if self.ip_is_blocked(request.remote_addr):
                 abort(403)
             try:
                 s = self.ips_instance.get_service(int(service_id))
@@ -240,9 +234,9 @@ class WebGUI:
 
         @self.app.route('/API/services/<service_id>/static', methods=['GET'])
         def whitelist_blacklist(service_id):
-            if not logged_in():
+            if not self.logged_in():
                 abort(401)
-            if ip_is_blocked(request.remote_addr):
+            if self.ip_is_blocked(request.remote_addr):
                 abort(403)
             try:
                 s = self.ips_instance.get_service(int(service_id))
@@ -254,9 +248,9 @@ class WebGUI:
 
         @self.app.route('/API/services/<service_id>/blocked', methods=['GET'])
         def blocked_ips(service_id):
-            if not logged_in():
+            if not self.logged_in():
                 abort(401)
-            if ip_is_blocked(request.remote_addr):
+            if self.ip_is_blocked(request.remote_addr):
                 abort(403)
             try:
                 return json.dumps(self.ips_instance.get_service(int(service_id)).get_blocked_ips(
@@ -274,3 +268,41 @@ class WebGUI:
                 return send_file(f"web/assets/{filename}")
             except FileNotFoundError:
                 abort(404)
+
+    def get_hashed_password(self, password: str) -> str:
+        """
+        Returns the hash for the input password, using SHA-256 and a fixed salt
+        @param password: original password
+        @return: hashed password
+        """
+        return hashlib.sha256((password + self._PASSWORD_SALT).encode()).hexdigest()
+
+    def is_password_correct(self, password: str, ip_addr=None) -> bool:
+        """
+        Checks the provided password against the hash; if it's not correct and the ip address is provided,
+        the failed attempt is logged into the log file
+        @param password: input password
+        @param ip_addr: source IP address (optional, it's logged in case of error)
+        @return: True if the password is correct, False otherwise
+        """
+        if self.get_hashed_password(password) == self.settings.admin_password:
+            return True
+        if ip_addr is not None:
+            log_warning(f"Failed login attempt to the admin panel from {str(ip_addr).lower()}")
+        return False
+
+    # noinspection PyMethodMayBeStatic
+    def logged_in(self) -> bool:
+        """
+        Checks if the user has started a session by entering the password
+        @return: True if the user is logged in
+        """
+        return session.get("admin") is not None
+
+    def ip_is_blocked(self, ip_addr) -> bool:
+        """
+        Checks if a certain IP address is blocked from the EasIPS web GUI
+        @param ip_addr: IP address to check
+        @return: True if the IP is blocked, False otherwise
+        """
+        return self.ips_instance.get_easips_service().is_blocked(str(ip_addr).lower())

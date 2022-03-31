@@ -2,12 +2,13 @@ import subprocess
 from abc import ABC, abstractmethod
 from typing import Union
 
+from easips.log import debug
 from easips.util import modify_ufw_rule, system_call
 
 
 class ServiceLock(ABC):
     """
-    This interface is used to implement adapters to block IPs from each of the required services
+    This interface is used to implement locks to block IPs from each of the required services
     """
 
     @abstractmethod
@@ -15,25 +16,35 @@ class ServiceLock(ABC):
         """
         This method blocks the specified IP address(es) from the corresponding service.
         It needs to be implemented in each subclass.
+        @param ip_addr: IP address(es) to block
+        @return: True if (all of) the block(s) were successful
         """
         raise NotImplementedError
 
     @abstractmethod
     def unblock(self, ip_addr: Union[str, list]) -> bool:
         """
-        This method blocks the specified IP address(es) from the corresponding service.
+        This method unblocks the specified IP address(es) from the corresponding service.
         It needs to be implemented in each subclass.
+        @param ip_addr: IP address(es) to unblock
+        @return: True if (all of) the unblock(s) were successful
         """
         raise NotImplementedError
 
 
 class FirewallLock(ServiceLock):
     """
-    This class is capable of (un)blocking IP addresses portwise
-    Note: root permissions are required to edit the required firewall settings
+    This class is capable of port-wise (un)blocking IP addresses using Linux's built-in firewall
+    @note Root permissions are required to edit the required firewall settings
     """
 
     def __init__(self, port: int, protocol: str = "tcp"):
+        """
+        FirewallLock's constructor
+        @param port: number of port to block
+        @param protocol: protocol (tcp/udp)
+        @raise: Exception if settings are invalid
+        """
         # TODO: possibility to allow port ranges
         self.port = port
         assert 0 <= port <= 65535
@@ -41,39 +52,58 @@ class FirewallLock(ServiceLock):
         assert system_call('sudo ufw enable')
 
     def block(self, ip_addr: Union[str, list]) -> bool:
-        if not isinstance(ip_addr, list):
-            ip_addr = [ip_addr]
-        success = True
-        for single_ip in ip_addr:
-            success &= modify_ufw_rule(f"ufw insert 1 deny from {single_ip} to any port {self.port} proto {self.proto}")
-            try:
-                # In case docker is used (docker avoids ufw)
-                system_call(f"iptables -I DOCKER -s {single_ip} -p tcp --dport {self.port} -j DROP")
-            except:
-                pass
-        return success
+        """
+        Block specified IP address(es) from the port
+        @param ip_addr: IP address(es) to block
+        @return: True if all blocks succeeded
+        """
+        return self.manage_ufw_rules(ip_addr, False)
 
     def unblock(self, ip_addr: Union[str, list]) -> bool:
+        """
+        Unblock specified IP address(es) from the port
+        @param ip_addr: IP address(es) to unblock
+        @return: True if all unblocks succeeded
+        """
+        return self.manage_ufw_rules(ip_addr, False)
+
+    def manage_ufw_rules(self, ip_addr: Union[str, list], block: bool) -> bool:
+        """
+        Common logic for blocking and unblocking
+        @param ip_addr: IP address(es) to (un)block
+        @param block: if True, rules are added; otherwise, deleted
+        @return: True if all (un)blocks succeeded
+        """
         if not isinstance(ip_addr, list):
             ip_addr = [ip_addr]
         success = True
         for single_ip in ip_addr:
-            success &= modify_ufw_rule(f"ufw delete deny from {single_ip} to any port {self.port} proto {self.proto}")
+            curr_success = modify_ufw_rule(f"ufw {'insert 1' if block else 'delete'} deny from {single_ip} "
+                                           f"to any port {self.port} proto {self.proto}")
             try:
                 # In case docker is used (docker avoids ufw)
-                system_call(f"iptables -D DOCKER -s {single_ip} -p tcp --dport {self.port} -j DROP")
-            except:
-                pass
+                curr_success |= system_call(f"iptables -{'I' if block else 'D'} DOCKER "
+                                            f"-s {single_ip} -p tcp --dport {self.port} -j DROP")
+            except Exception as e:
+                debug(e)
+            success &= curr_success
         return success
 
 
 class HTAccessLock(ServiceLock):
     """
-    This class is capable of (un)blocking IP addresses from a web service
-    This method is based on modifying the .htaccess file on the desired path
+    This class is capable of path-wise (un)blocking IP addresses from a web service
+    This method is based on modifying the .htaccess file on the desired path, which should be write-accessible
+    @note The webserver must be Apache-based for .htaccess to work
     """
 
     def __init__(self, web_path: str, blocked_html_file: str):
+        """
+        HTAccessLock's constructor
+        @param web_path: absolute local path to the folder to be blocked
+        @param blocked_html_file: path to the HTML file to show when a blocked user tries to load the website
+        @raise: Exception if settings are invalid
+        """
         if web_path[-1] != '/' and web_path[-1] != '\\':
             web_path += '/'
         self.path = web_path + '.htaccess'
@@ -83,6 +113,11 @@ class HTAccessLock(ServiceLock):
         open(self.path, 'w').close()  # Will throw an Exception if path is not valid or there's a lack of permissions
 
     def block(self, ip_addr: Union[str, list]) -> bool:
+        """
+        Block specified IP address(es) from the path
+        @param ip_addr: IP address(es) to block
+        @return: True if all blocks succeeded
+        """
         if not isinstance(ip_addr, list):
             ip_addr = [ip_addr]
         ip_addr = [x.strip().lower() for x in ip_addr]
@@ -129,10 +164,16 @@ class HTAccessLock(ServiceLock):
             f.write(new_contents)
             f.close()
             return True
-        except:
+        except Exception as e:
+            debug(e)
             return False
 
     def unblock(self, ip_addr: Union[str, list]) -> bool:
+        """
+        Unblock specified IP address(es) from the path
+        @param ip_addr: IP address(es) to unblock
+        @return: True if all unblocks succeeded
+        """
         if not isinstance(ip_addr, list):
             ip_addr = [ip_addr]
         ip_addr = [x.strip().lower() for x in ip_addr]
@@ -150,21 +191,33 @@ class HTAccessLock(ServiceLock):
             return True
         except FileNotFoundError:
             return True
-        except:
+        except Exception as e:
+            debug(e)
             return False
 
 
-class EtcHostsLock(ServiceLock):
+class DaemonLock(ServiceLock):
     """
-    This class is capable of (un)blocking IP addresses from any daemon
-    This method is based on modifying the /etc/hosts.deny file (which needs root access)
+    This class is capable of (un)blocking IP addresses given the daemon name
+    @note This method is based on modifying the /etc/hosts.deny file (which needs Linux arch and root access)
     """
 
     def __init__(self, service_daemon_name: str, etc_hosts_deny_path: str = "/etc/hosts.deny"):
+        """
+        DaemonLock's constructor
+        @param service_daemon_name: daemon name (e.g.: sshd)
+        @param etc_hosts_deny_path: absolute local path to the file (obviously defaults to /etc/hosts.deny)
+        @raise: Exception if settings are invalid
+        """
         self.daemon = service_daemon_name  # TODO: check if the daemon exists
         self.path = etc_hosts_deny_path
 
     def block(self, ip_addr: Union[str, list]) -> bool:
+        """
+        Block specified IP address(es) from the daemon
+        @param ip_addr: IP address(es) to block
+        @return: True if all blocks succeeded
+        """
         if not isinstance(ip_addr, list):
             ip_addr = [ip_addr]
         try:
@@ -190,10 +243,16 @@ class EtcHostsLock(ServiceLock):
             f.write(new_contents)
             f.close()
             return True
-        except:
+        except Exception as e:
+            debug(e)
             return False
 
     def unblock(self, ip_addr: Union[str, list]) -> bool:
+        """
+        Unblock specified IP address(es) from the daemon
+        @param ip_addr: IP address(es) to unblock
+        @return: True if all unblocks succeeded
+        """
         if not isinstance(ip_addr, list):
             ip_addr = [ip_addr]
         try:
@@ -217,5 +276,6 @@ class EtcHostsLock(ServiceLock):
             return True
         except FileNotFoundError:
             return True
-        except:
+        except Exception as e:
+            debug(e)
             return False

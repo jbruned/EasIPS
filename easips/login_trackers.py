@@ -6,6 +6,9 @@ from typing import List
 
 
 class LoginTracker (ABC):
+    """
+    Interface that allows to implement failed login attempts detectors using a polling strategy
+    """
 
     @abstractmethod
     def poll(self) -> list:
@@ -19,10 +22,15 @@ class LoginTracker (ABC):
 
 class LogSniffer(LoginTracker):
     """
-    Detects failed login attempts by reading the log files and applying a regular expression
+    Detects failed login attempts by reading the log files and filtering by means of a regular expression
     """
 
     def __init__(self, log_path: str, log_regexes: List[str]):
+        """
+        LogSniffer's constructor
+        @param log_path: absolute local path to the log file
+        @param log_regexes: regular expression(s) to filter out failed login attempts
+        """
         self.log_path = log_path
         self.previous_size = getsize(self.log_path)
         self.log_file = open(self.log_path, 'r')
@@ -30,6 +38,10 @@ class LogSniffer(LoginTracker):
         self.patterns = [compile(regex) for regex in log_regexes]
 
     def poll(self) -> list:
+        """
+        Get list of IPs for which failed login attempts have been logged
+        @return: list of IPs with failed login attempts since the last call
+        """
         if self.previous_size > (size := os.path.getsize(self.log_path)):
             self.log_file.close()
             self.log_file = open(self.log_path, 'r')

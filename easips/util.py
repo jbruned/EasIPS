@@ -5,10 +5,16 @@ from typing import Union
 
 
 class NotFoundException(Exception):
+    """
+    Exception to raise when the requested object doesn't exist
+    """
     pass
 
 
 class InvalidSettingsException(Exception):
+    """
+    Exception to raise when the settings of a service are not valid, and it cannot be started
+    """
     pass
 
 
