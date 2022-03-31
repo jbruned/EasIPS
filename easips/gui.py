@@ -9,7 +9,7 @@ from flask_sqlalchemy import SQLAlchemy
 from easips.core import ProtectedService, BackgroundIPS
 from easips.db import ServiceSettings, AppSettings
 from easips.log import log_warning
-from easips.util import InvalidSettingsException, NotFoundException
+from easips.util import InvalidSettingsException, NotFoundException, ip_addr_is_valid
 
 
 class WebGUI:
@@ -186,11 +186,67 @@ class WebGUI:
                 if not s.are_components_initialized():
                     abort(418)
                 data = request.form
+                if not ip_addr_is_valid(data['ip_address'] or ''):
+                    raise ValueError
                 if data['block'] == 'false':
                     s.unblock(data['ip_address'], db)
                 else:
                     s.block(data['ip_address'], db)
                 return str(s.settings.id), 200
+            except ValueError:
+                abort(400)
+            except NotFoundException:
+                abort(404)
+
+        @self.app.route('/API/services/<service_id>/static', methods=['POST'])
+        def add_static_rule(service_id):
+            if not logged_in():
+                abort(401)
+            if ip_is_blocked(request.remote_addr):
+                abort(403)
+            try:
+                s = self.ips_instance.get_service(int(service_id))
+                if not s.are_components_initialized():
+                    abort(418)
+                data = request.form
+                if not ip_addr_is_valid(data['ip_address'] or ''):
+                    raise ValueError
+                s.create_static_rule(data['ip_address'], data['block'] == 'true', db)
+                return 'OK', 200
+            except ValueError:
+                abort(400)
+            except NotFoundException:
+                abort(404)
+
+        @self.app.route('/API/services/<service_id>/static', methods=['DELETE'])
+        def remove_static_rule(service_id):
+            if not logged_in():
+                abort(401)
+            if ip_is_blocked(request.remote_addr):
+                abort(403)
+            try:
+                s = self.ips_instance.get_service(int(service_id))
+                if not s.are_components_initialized():
+                    abort(418)
+                data = request.form
+                if not ip_addr_is_valid(data['ip_address'] or ''):
+                    raise ValueError
+                s.remove_static_rule(data['ip_address'], db)
+                return 'OK', 200
+            except ValueError:
+                abort(400)
+            except NotFoundException:
+                abort(404)
+
+        @self.app.route('/API/services/<service_id>/static', methods=['GET'])
+        def whitelist_blacklist(service_id):
+            if not logged_in():
+                abort(401)
+            if ip_is_blocked(request.remote_addr):
+                abort(403)
+            try:
+                s = self.ips_instance.get_service(int(service_id))
+                return json.dumps(s.get_static_rules()), 200
             except ValueError:
                 abort(400)
             except NotFoundException:
