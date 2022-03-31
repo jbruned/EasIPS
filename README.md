@@ -4,9 +4,9 @@ This repo contains the source code for *EasIPS*, an easy-to-use and customizable
 
 ## General information
 
-This software allows to dynamically block IPs who exceed a configurable number of failed login attempts in a customizable amount of time during an also user-defined time period.
+This software allows to dynamically block IPs that exceed a configurable number of failed login attempts in a customizable amount of time during an also user-defined time period.
 
-These settings can be adjusted from the web-based graphical user interface, where blocked IPs and more information can also be listed.
+These and many other settings can be adjusted from the web-based graphical user interface, where blocked IPs and more information can also be listed.
 
 ### Supported services
 
@@ -28,7 +28,7 @@ This script will run the application in the background, as well as the web *GUI*
     - `login_trackers.py` for `LoginTracker` and its implementations
     - `/web` for the static GUI files (HTML, CSS & JavaScript)
     - `gui.py` for the Flask application
-    - `db.py` for the database and model creation
+    - `db.py` for the database and models
     - `core.py` for the main loop and service management
     - `app.py`, which contains the main class that needs to be instantiated and run (`EasIPS`)
 - `/ssh`, `/joomla`, `/phpMyAdmin`, `/wordpress` for the different services
