@@ -35,7 +35,7 @@ let left4refresh = 0;
 function addService(id, name, running, blockednow, blocked24, lastblock) {
     let is_running = !(running === 'false' || running == 0 || false);
     servicePool.innerHTML +=
-        '            <div class="col-md-4">\n' +
+        '            <div class="col-md-6 col-xl-4">\n' +
         '                <div class="card my-3">\n' +
         '                    <div class="card-header d-flex justify-content-between align-items-center"><div>\n' +
         '                        <h3 class="card-title m-0">' + name + '</h3>\n' +
