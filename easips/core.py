@@ -297,7 +297,14 @@ class ProtectedService:
         @param ip_addr: the IP address to remove from the whitelist/blacklist
         @param db: the database where the rules are stored
         """
-        StaticRule.query.filter(StaticRule.service_id == self.settings.id, StaticRule.ip_addr == ip_addr).delete()
+        query = StaticRule.query.filter(StaticRule.service_id == self.settings.id, StaticRule.ip_addr == ip_addr)
+        if query.first().blocked:
+            try:
+                if self.settings.service != 'easips':
+                    self.lock.unblock(ip_addr)
+            except Exception as e:
+                debug(e)
+        query.delete()
         if db is not None:
             db.session.commit()
 
