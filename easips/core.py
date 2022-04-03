@@ -271,7 +271,7 @@ class ProtectedService:
                 if is_blocked and not set_blocked:
                     self.lock.unblock(ip_addr)
                 elif not is_blocked and set_blocked:
-                    self.lock.unblock(ip_addr)
+                    self.lock.block(ip_addr)
             query = BlockedIP.query.filter(BlockedIP.service_id == self.settings.id, BlockedIP.ip_addr == ip_addr,
                                            BlockedIP.active)
             for obj in query.all():
