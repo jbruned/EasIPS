@@ -57,7 +57,7 @@ class FirewallLock(ServiceLock):
         @param ip_addr: IP address(es) to block
         @return: True if all blocks succeeded
         """
-        return self.manage_ufw_rules(ip_addr, False)
+        return self.manage_ufw_rules(ip_addr, True)
 
     def unblock(self, ip_addr: Union[str, list]) -> bool:
         """
